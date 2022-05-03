@@ -43,7 +43,7 @@ import qualified PlutusTx
 import           PlutusTx.Prelude
 import qualified Plutus.V1.Ledger.Ada     as Ada
 import qualified Plutus.V1.Ledger.Scripts as Scripts
--- import qualified Plutus.V1.Ledger.Value   as Value
+import qualified Plutus.V1.Ledger.Value   as Value
 import           CheckFuncs
 import           DataTypes
 -- import           Data.Maybe
@@ -72,9 +72,12 @@ PlutusTx.makeLift ''LockingContractParams
 -------------------------------------------------------------------------------
 -- | Create the redeemer parameters data object.
 -------------------------------------------------------------------------------
-data CustomRedeemerType = Remove OutboundRedeemerType | Add InboundRedeemerType
+data CustomRedeemerType = Remove OutboundRedeemerType | 
+                          Add InboundRedeemerType     |
+                          Close
 PlutusTx.makeIsDataIndexed ''CustomRedeemerType [ ('Remove, 0)
                                                 , ('Add,    1) 
+                                                , ('Close,  2) 
                                                 ]
 PlutusTx.makeLift ''CustomRedeemerType
 -------------------------------------------------------------------------------
@@ -85,16 +88,27 @@ mkValidator :: LockingContractParams -> CustomDatumType -> CustomRedeemerType ->
 mkValidator _ datum redeemer context =
   case redeemer of
     (Remove ort) -> do
-      { let a = traceIfFalse "The Seller Is Not Signing Tx"  $ txSignedBy info (ortSellerPKH ort) && txSignedBy info profitPKH
-      ; let b = traceIfFalse "Only Single Script UTxO in Tx" $ isNScriptInputs txInputs (1 :: Integer)
-      ;         traceIfFalse "Error: Remove Endpoint"        $ all (==True) [a,b]
+      { let a = traceIfFalse "MultiSig Failure"       $ txSignedBy info (ortSellerPKH ort) && txSignedBy info profitPKH
+      ; let b = traceIfFalse "Script UTxO Failure"    $ isNScriptInputs txInputs (1 :: Integer)
+      ; let c = traceIfFalse "Cont Value Failure"     $ isValueContinuing contOutputs (validatingValue - (Ada.lovelaceValueOf $ ortAmount ort))
+      ; let d = traceIfFalse "User Value Failure"     $ isPKHGettingValue txOutputs (ortSellerPKH ort) (Ada.lovelaceValueOf $ ortAmount ort)
+      ; let e = traceIfFalse "Profit Value Failure"   $ isPKHGettingValue txOutputs profitPKH (Ada.lovelaceValueOf $ ortProfit ort)
+      ; let f = traceIfFalse "Value is at Minimum"    $ Value.gt validatingValue minimumValue
+      ; let g = traceIfFalse "Incoming Datum Failure" $ isEmbeddedDatum datum info contOutputs
+      ;         traceIfFalse "Error: Remove Endpoint" $ all (==True) [a,b,c,d,e,f,g]
       }
     (Add irt) -> do
-      { let a = traceIfFalse "The Seller Is Not Signing Tx"  $ txSignedBy info (irtSellerPKH irt)
-      ; let b = traceIfFalse "Only Single Script UTxO in Tx" $ isNScriptInputs txInputs (1 :: Integer)
-      ; let c = traceIfFalse "Value is not continue back"    $ isValueContinuing contOutputs (validatingValue + (Ada.lovelaceValueOf $ irtAmount irt))
-      ; let d = traceIfFalse "Incorrect Incoming Datum"      $ isEmbeddedDatum datum info contOutputs
-      ;         traceIfFalse "Error: Add Endpoint"           $ all (==True) [a,b,c,d]
+      { let a = traceIfFalse "User Signature Failure" $ txSignedBy info (irtSellerPKH irt)
+      ; let b = traceIfFalse "Script UTxO Failure"    $ isNScriptInputs txInputs (1 :: Integer)
+      ; let c = traceIfFalse "Cont Value Failure"     $ isValueContinuing contOutputs (validatingValue + (Ada.lovelaceValueOf $ irtAmount irt))
+      ; let d = traceIfFalse "Incoming Datum Failure" $ isEmbeddedDatum datum info contOutputs
+      ;         traceIfFalse "Error: Add Endpoint"    $ all (==True) [a,b,c,d]
+      }
+    Close -> do
+      { let a = traceIfFalse "Signature Failure"      $ txSignedBy info profitPKH
+      ; let b = traceIfFalse "Profit Value Failure"   $ isPKHGettingValue txOutputs profitPKH minimumValue
+      ; let c = traceIfFalse "Value is at Minimum"    $ validatingValue == minimumValue
+      ;         traceIfFalse "Error: Remove Endpoint" $ all (==True) [a,b,c]
       }
   where
     info :: TxInfo
@@ -102,6 +116,9 @@ mkValidator _ datum redeemer context =
 
     txInputs :: [TxInInfo]
     txInputs = txInfoInputs info
+
+    txOutputs :: [TxOut]
+    txOutputs = txInfoOutputs info
 
     contOutputs :: [TxOut]
     contOutputs = getContinuingOutputs context
@@ -115,6 +132,8 @@ mkValidator _ datum redeemer context =
         Nothing    -> traceError "ERROR!"
         Just input -> txOutValue $ txInInfoResolved input
 
+    minimumValue :: Value
+    minimumValue = Ada.lovelaceValueOf (5000000 :: Integer)
 -------------------------------------------------------------------------------
 -- | This determines the data type for Datum and Redeemer.
 -------------------------------------------------------------------------------

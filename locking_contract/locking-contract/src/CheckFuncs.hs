@@ -29,9 +29,10 @@ module CheckFuncs
   ( isNScriptInputs
   , isValueContinuing
   , isEmbeddedDatum
+  , isPKHGettingValue
   ) where
 import           PlutusTx.Prelude
--- import qualified Plutus.V1.Ledger.Address as Address
+import qualified Plutus.V1.Ledger.Address as Address
 -- import qualified Plutus.V1.Ledger.Value   as Value
 import           Ledger                   hiding (singleton)
 import           DataTypes                (CustomDatumType)
@@ -41,6 +42,20 @@ import qualified PlutusTx
   Copyright: 2022
   Version  : Rev 0
 -}
+-------------------------------------------------------------------------------
+-- | Search each TxOut for the correct address and value.
+-------------------------------------------------------------------------------
+isPKHGettingValue :: [TxOut] -> PubKeyHash -> Value -> Bool
+isPKHGettingValue [] _pkh _val = False
+isPKHGettingValue (x:xs) pkh val
+  | checkAddr && checkVal = True
+  | otherwise             = isPKHGettingValue xs pkh val
+  where
+    checkAddr :: Bool
+    checkAddr = txOutAddress x == Address.pubKeyHashAddress pkh
+
+    checkVal :: Bool
+    checkVal = txOutValue x == val
 -------------------------------------------------------------------------------
 -- | Search each TxOut for a value.
 -------------------------------------------------------------------------------

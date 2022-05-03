@@ -30,6 +30,8 @@ module DataTypes
   , cdtProfitPKH
   , OutboundRedeemerType
   , ortSellerPKH
+  , ortAmount
+  , ortProfit
   , InboundRedeemerType
   , irtSellerPKH
   , irtAmount
@@ -50,8 +52,11 @@ import           GHC.Generics              (Generic)
 -------------------------------------------------------------------------------
 -- | Custom data object for storing swap half data.
 -------------------------------------------------------------------------------
-newtype OutboundRedeemerType = OutboundRedeemerType
-  { ortSellerPKH :: PubKeyHash }
+data OutboundRedeemerType = OutboundRedeemerType
+  { ortSellerPKH :: !PubKeyHash
+  , ortAmount    :: !Integer
+  , ortProfit    :: !Integer
+  }
     deriving stock    (Show, Generic)
     deriving anyclass (FromJSON, ToJSON, ToSchema)
 PlutusTx.unstableMakeIsData ''OutboundRedeemerType

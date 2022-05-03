@@ -1,13 +1,17 @@
-```bash
-curl -H 'Accept: application/json' \
--u admin:qwe123 \
--d 'pkh=somepkhhere' \
-http://127.0.0.1:8000/entries/getUTxOs/
+Install required node modules
+```
+cd api
+npm install
 ```
 
-```bash
-curl  -X POST -H 'Accept: application/json' \
--u admin:qwe123 \
--d 'pkh=somepkhhere' \
-http://127.0.0.1:8000/entries/newAccount/
+Run api server
+```
+python manage.py makemigrations
+python manage.py migrate
+```
+
+
+Run api server
+```
+python manage.py runserver
 ```

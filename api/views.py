@@ -1,6 +1,6 @@
 from api.models import Entry, Account, UTxO, Task
 from api.validation import didPkhSignTx, isTxConserved, doesPkhOwnInputs
-from api.helper import hashTxBody, deleteUtxosWrapper, newUtxosWrapper, sendTxWrapper, validateTxWrapper
+from api.helper import hashTxBody, deleteUtxosWrapper, newUtxosWrapper, sendTxWrapper, validateTxWrapper, merkleTree
 from rest_framework import viewsets
 from rest_framework import permissions
 from api.serializers import EntrySerializer, TaskSerializer
@@ -22,12 +22,69 @@ class TaskViewSet(viewsets.ModelViewSet):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
     permission_classes = [permissions.IsAuthenticated]
-    # create a new account
+    
+    # # create a new account
+    # @action(methods=['post'], detail=False, permission_classes=[permissions.IsAuthenticated])
+    # def newTask(self, request):
+    #     """
+    #     /tasks/newTask/
+
+    #     @see: api.tests.TaskApiTest
+
+    #     Payload Format:
+    #     """
+    #     # No empty pkh
+    #     data = str(request.POST['payload'])
+    #     data = loads(bytes.fromhex(data))
+    #     good['data'] ='Success'
+    #     return Response(good)
+    
+    # merkle tree of a singleusers transactions
+    @action(methods=['post'], detail=False, permission_classes=[permissions.IsAuthenticated])
+    def getMerkleTree(self, request):
+        """
+        /tasks/getMerkleTree/
+
+        @see: api.tests.TaskApiTest
+
+         Payload Format: Public Key Hash (hexdecimal)
+
+        Chain Agnostic PKH
+        """
+        # No empty pkh
+        data = str(request.POST['payload'])
+        data = loads(bytes.fromhex(data))
+        pkh = data['pkh']
+        if pkh == '':
+            bad['data'] = "Missing Data"
+            return Response(bad)
+        payload = []
+        for task in Task.objects.all():
+            accounts = task.account.all()
+            for account in accounts:
+                if str(account.pkh) == pkh:
+                    payload.append((task.cbor, task.number))
+        payload.sort(key=lambda y: y[1])
+        txIds = [a for a,_ in payload]
+        good['data'] = merkleTree(txIds)
+        return Response(good)
+
+    # get all the tasks
     @action(methods=['post'], detail=False, permission_classes=[permissions.IsAuthenticated])
     def getAll(self, request):
         """
         /tasks/getAll/
+
+        @see: api.tests.TaskApiTest
+
+        No Payload
         """
+        payload = []
+        # print(Task.objects.all()[0].account.all())
+        for task in Task.objects.all():
+            payload.append((task.cbor, task.number))
+        payload.sort(key=lambda y: y[1])
+        good['data'] = payload
         return Response(good)
 
 class EntryViewSet(viewsets.ModelViewSet):

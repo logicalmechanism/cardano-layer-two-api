@@ -3,7 +3,7 @@ set -e
 
 export CARDANO_NODE_SOCKET_PATH=$(cat path_to_socket.sh)
 cli=$(cat path_to_cli.sh)
-script_path="../order-book/order_book.plutus"
+script_path="../locking-contract/locking_contract.plutus"
 
 SCRIPT_ADDRESS=$(${cli} address build --payment-script-file ${script_path} --testnet-magic 1097911063)
 SELLER_ADDRESS=$(cat wallets/seller-wallet/payment.addr)

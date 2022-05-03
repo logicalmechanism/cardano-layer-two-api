@@ -1,9 +1,33 @@
 from hashlib import blake2b
 from api.validation import isTxConserved, doesPkhOwnInputs, didPkhSignTx
 from api.models import Entry, Account, UTxO, Value, Token
+from api.contracts import Contract
 from cbor2 import dumps
 
+def merkleTree(txIds:list) -> str:
+    """
+    Calculate the merkle tree from a list of tx ids.
+    """
+    numberOfTx = len(txIds)
+    if numberOfTx % 2 == 0:
+        pairs = [(txIds[i], txIds[i+1]) for i in range(0, numberOfTx, 2)]
+    else:
+        pairs = [(txIds[i], txIds[i+1]) for i in range(0, numberOfTx-1, 2)]
+    hashes = []
+    for a, b in pairs:
+        hashes.append(hashTxBody(str(a)+str(b)))
+    # Return the last hash
+    if len(hashes) == 1:
+        return hashes[0]
+    # correct for odd lengths
+    if numberOfTx % 2 != 0:
+        hashes.append(txIds[-1])
+    return merkleTree(hashes)
+
 def constructTxBody(inputs:dict, outputs:dict, fee:int) -> str:
+    """
+    Create a cbor payload of the txBody.
+    """
     txBody = {
         'inputs': inputs,
         'outputs': outputs,
@@ -75,9 +99,15 @@ def validateTxWrapper(data:list) -> bool:
 
         if didPkhSignTx(signature) != pkh:
             return False
-    # Passed Validation
-    return totalInputs == 0
-    # return True
+    
+    # Missing Signers
+    if totalInputs != 0:
+        return False
+    
+    # CONTRACT
+    func_name = data[2]
+    contract = Contract()
+    return getattr(contract, func_name)(inputs, outputs)
 
 def sendTxWrapper(inputs:dict, outputs:dict, txId:str) -> bool:
     FEE = "feepkhhere"

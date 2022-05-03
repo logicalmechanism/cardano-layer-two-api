@@ -39,7 +39,6 @@ module DataTypes
 import qualified PlutusTx
 import           PlutusTx.Prelude
 import           Ledger                    hiding (singleton)
--- import qualified Plutus.V1.Ledger.Contexts as Contexts
 import           Prelude                   (Show)
 import           Data.Aeson                (FromJSON, ToJSON)
 import           Data.OpenApi.Schema       (ToSchema)
@@ -56,6 +55,7 @@ data OutboundRedeemerType = OutboundRedeemerType
   { ortSellerPKH :: !PubKeyHash
   , ortAmount    :: !Integer
   , ortProfit    :: !Integer
+  , ortProof     :: !BuiltinByteString
   }
     deriving stock    (Show, Generic)
     deriving anyclass (FromJSON, ToJSON, ToSchema)
@@ -84,4 +84,4 @@ PlutusTx.makeLift           ''CustomDatumType
 -- old is a; new is b
 instance Eq CustomDatumType where
   {-# INLINABLE (==) #-}
-  a == b =  (cdtProfitPKH a == cdtProfitPKH  b)
+  a == b =  ( cdtProfitPKH a == cdtProfitPKH b )

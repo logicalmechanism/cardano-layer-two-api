@@ -1,9 +1,9 @@
-from api.models import Entry, Account, UTxO
+from api.models import Entry, Account, UTxO, Task
 from api.validation import didPkhSignTx, isTxConserved, doesPkhOwnInputs
 from api.helper import hashTxBody, deleteUtxosWrapper, newUtxosWrapper, sendTxWrapper, validateTxWrapper
 from rest_framework import viewsets
 from rest_framework import permissions
-from api.serializers import EntrySerializer
+from api.serializers import EntrySerializer, TaskSerializer
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from cbor2 import dumps, loads
@@ -15,9 +15,24 @@ accountExist  = { 'status': 409, 'data': 'Account Already Exists' }
 utxoExist  = { 'status': 409, 'data': 'UTxO Already Exists' }
 noAccount  = { 'status': 401, 'data': 'No Account Exists' }
 
+class TaskViewSet(viewsets.ModelViewSet):
+    """
+    API endpoints for the task db of tasks.
+    """
+    queryset = Task.objects.all()
+    serializer_class = TaskSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    # create a new account
+    @action(methods=['post'], detail=False, permission_classes=[permissions.IsAuthenticated])
+    def getAll(self, request):
+        """
+        /tasks/getAll/
+        """
+        return Response(good)
+
 class EntryViewSet(viewsets.ModelViewSet):
     """
-    API endpoint that allows users to be viewed or edited.
+    API endpoints for the state db of entries.
     """
     queryset = Entry.objects.all()
     serializer_class = EntrySerializer
@@ -197,7 +212,7 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         Payload Format: CBOR
         
-        [txBody, [txSign]] -> [{inputs:{}, outputs:{}, fee:0}, [{pkh:"", data:"", sig:""}]]
+        [txBody, [txSign], contract] -> [{inputs:{}, outputs:{}, fee:0}, [{pkh:"", data:"", sig:""}], 'always_succeed']
         """
         # List of UTxOs to Delete from an Account
         data = str(request.POST['payload'])
@@ -207,7 +222,7 @@ class EntryViewSet(viewsets.ModelViewSet):
             bad["data"] = "Wrong Data Type"
             return Response(bad)
         # must contain the body and sig
-        if len(data) != 2:
+        if len(data) != 3:
             bad['data'] = 'Missing Fields'
             return Response(bad)
         # validate the data

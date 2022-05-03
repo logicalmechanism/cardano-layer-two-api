@@ -33,7 +33,6 @@ module CheckFuncs
   ) where
 import           PlutusTx.Prelude
 import qualified Plutus.V1.Ledger.Address as Address
--- import qualified Plutus.V1.Ledger.Value   as Value
 import           Ledger                   hiding (singleton)
 import           DataTypes                (CustomDatumType)
 import qualified PlutusTx

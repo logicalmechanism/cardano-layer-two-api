@@ -46,23 +46,10 @@ import qualified Plutus.V1.Ledger.Scripts as Scripts
 import qualified Plutus.V1.Ledger.Value   as Value
 import           CheckFuncs
 import           DataTypes
--- import           Data.Maybe
 {- |
   Author   : The Ancient Kraken
   Copyright: 2022
   Version  : Rev 0
-
-    @see remove
-
-  Versions Used In Project:
-
-  cardano-cli 1.34.1 - linux-x86_64 - ghc-8.10
-  git rev 73f9a746362695dc2cb63ba757fbcabb81733d23
-
-  cabal-install version 3.4.0.0
-  compiled using version 3.4.0.0 of the Cabal library
-
-  The Glorious Glasgow Haskell Compilation System, version 8.10.4
 -}
 -------------------------------------------------------------------------------
 -- | Create the token sale parameters data object.
@@ -93,7 +80,7 @@ mkValidator _ datum redeemer context =
       ; let c = traceIfFalse "Cont Value Failure"     $ isValueContinuing contOutputs (validatingValue - (Ada.lovelaceValueOf $ ortAmount ort))
       ; let d = traceIfFalse "User Value Failure"     $ isPKHGettingValue txOutputs (ortSellerPKH ort) (Ada.lovelaceValueOf $ ortAmount ort)
       ; let e = traceIfFalse "Profit Value Failure"   $ isPKHGettingValue txOutputs profitPKH (Ada.lovelaceValueOf $ ortProfit ort)
-      ; let f = traceIfFalse "Value is at Minimum"    $ Value.gt validatingValue minimumValue
+      ; let f = traceIfFalse "Value Is At Minimum"    $ Value.geq validatingValue (minimumValue + (Ada.lovelaceValueOf $ irtAmount irt))
       ; let g = traceIfFalse "Incoming Datum Failure" $ isEmbeddedDatum datum info contOutputs
       ;         traceIfFalse "Error: Remove Endpoint" $ all (==True) [a,b,c,d,e,f,g]
       }
@@ -105,10 +92,10 @@ mkValidator _ datum redeemer context =
       ;         traceIfFalse "Error: Add Endpoint"    $ all (==True) [a,b,c,d]
       }
     Close -> do
-      { let a = traceIfFalse "Signature Failure"      $ txSignedBy info profitPKH
-      ; let b = traceIfFalse "Profit Value Failure"   $ isPKHGettingValue txOutputs profitPKH minimumValue
-      ; let c = traceIfFalse "Value is at Minimum"    $ validatingValue == minimumValue
-      ;         traceIfFalse "Error: Remove Endpoint" $ all (==True) [a,b,c]
+      { let a = traceIfFalse "Profit Signature Failure" $ txSignedBy info profitPKH
+      ; let b = traceIfFalse "Profit Value Failure"     $ isPKHGettingValue txOutputs profitPKH minimumValue
+      ; let c = traceIfFalse "Value Is Not At Minimum"  $ validatingValue == minimumValue
+      ;         traceIfFalse "Error: Remove Endpoint"   $ all (==True) [a,b,c]
       }
   where
     info :: TxInfo

@@ -28,6 +28,7 @@
 module DataTypes
   ( CustomDatumType
   , cdtProfitPKH
+  , cdtMajority
   , OutboundRedeemerType
   , ortSellerPKH
   , ortAmount
@@ -35,6 +36,10 @@ module DataTypes
   , InboundRedeemerType
   , irtSellerPKH
   , irtAmount
+  , (=+=)
+  , (=-=)
+  , (=?=)
+  , length'
   ) where
 import qualified PlutusTx
 import           PlutusTx.Prelude
@@ -48,6 +53,13 @@ import           GHC.Generics              (Generic)
   Copyright: 2022
   Version  : Rev 0
 -}
+-------------------------------------------------------------------------------
+-- | Define custom equality class called Equiv.
+-------------------------------------------------------------------------------
+class Equiv a b where
+  (=+=) :: a -> b -> Bool
+  (=-=) :: a -> b -> Bool
+  (=?=) :: a -> b -> Bool
 -------------------------------------------------------------------------------
 -- | Custom data object for storing swap half data.
 -------------------------------------------------------------------------------
@@ -65,7 +77,7 @@ PlutusTx.makeLift           ''OutboundRedeemerType
 -- | Custom data object for storing swap half data.
 -------------------------------------------------------------------------------
 data InboundRedeemerType = InboundRedeemerType
-  { irtSellerPKH :: !PubKeyHash 
+  { irtSellerPKH :: !PubKeyHash
   , irtAmount    :: !Integer
   }
     deriving stock    (Show, Generic)
@@ -76,7 +88,9 @@ PlutusTx.makeLift           ''InboundRedeemerType
 -- | Custom datum object for storing utxo data.
 -------------------------------------------------------------------------------
 data CustomDatumType = CustomDatumType
-  { cdtProfitPKH :: !PubKeyHash }
+  { cdtProfitPKH :: ![PubKeyHash]
+  , cdtMajority  :: !Integer
+  }
     deriving stock    (Show, Generic)
     deriving anyclass (FromJSON, ToJSON, ToSchema)
 PlutusTx.unstableMakeIsData ''CustomDatumType
@@ -84,4 +98,25 @@ PlutusTx.makeLift           ''CustomDatumType
 -- old is a; new is b
 instance Eq CustomDatumType where
   {-# INLINABLE (==) #-}
-  a == b =  ( cdtProfitPKH a == cdtProfitPKH b )
+  a == b = ( cdtProfitPKH a == cdtProfitPKH b ) &&
+           ( cdtMajority  a == cdtMajority  b )
+-------------------------------------------------------------------------------
+-- | Create equiv instance
+-------------------------------------------------------------------------------
+length' ::  [PubKeyHash] -> Integer
+length' pkhs = length'' pkhs 0
+  where
+    length'' :: [PubKeyHash] -> Integer -> Integer
+    length'' [] counter = counter
+    length'' (_:pkhs') !counter = length'' pkhs' (counter + 1)
+-- old is a; new is b
+instance Equiv CustomDatumType CustomDatumType where
+  {-# INLINABLE (=+=) #-}
+  a =+= b = ( length' (cdtProfitPKH a) == length' (cdtProfitPKH b) + 1 ) &&
+            ( cdtMajority  a == cdtMajority  b )
+  {-# INLINABLE (=-=) #-}
+  a =-= b = ( length' (cdtProfitPKH a) == length' (cdtProfitPKH b) - 1 ) &&
+            ( cdtMajority  a == cdtMajority  b )
+  {-# INLINABLE (=?=) #-}
+  a =?= b = ( cdtProfitPKH a == cdtProfitPKH b ) &&
+            ( cdtMajority  a /= cdtMajority  b )

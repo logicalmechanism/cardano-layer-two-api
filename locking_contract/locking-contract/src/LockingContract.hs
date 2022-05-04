@@ -59,12 +59,14 @@ PlutusTx.makeLift ''LockingContractParams
 -------------------------------------------------------------------------------
 -- | Create the redeemer parameters data object.
 -------------------------------------------------------------------------------
-data CustomRedeemerType = Remove OutboundRedeemerType | 
-                          Add InboundRedeemerType     |
-                          Close
+data CustomRedeemerType = Remove OutboundRedeemerType |
+                          Add     InboundRedeemerType |
+                          Close                       |
+                          Vote
 PlutusTx.makeIsDataIndexed ''CustomRedeemerType [ ('Remove, 0)
-                                                , ('Add,    1) 
-                                                , ('Close,  2) 
+                                                , ('Add,    1)
+                                                , ('Close,  2)
+                                                , ('Vote,   3)
                                                 ]
 PlutusTx.makeLift ''CustomRedeemerType
 -------------------------------------------------------------------------------
@@ -75,29 +77,63 @@ mkValidator :: LockingContractParams -> CustomDatumType -> CustomRedeemerType ->
 mkValidator _ datum redeemer context =
   case redeemer of
     (Remove ort) -> do
-      { let a = traceIfFalse "MultiSig Failure"       $ txSignedBy info (ortSellerPKH ort) && txSignedBy info profitPKH
+      { let outboundADA = Ada.lovelaceValueOf $ ortAmount ort
+      ; let userPKH     = ortSellerPKH ort
+      ; let a = traceIfFalse "MultiSig Failure"       $ txSignedBy info userPKH && hasEnoughSigners info datum majorityParam
       ; let b = traceIfFalse "Script UTxO Failure"    $ isNScriptInputs txInputs (1 :: Integer)
-      ; let c = traceIfFalse "Cont Value Failure"     $ isValueContinuing contOutputs (validatingValue - (Ada.lovelaceValueOf $ ortAmount ort))
-      ; let d = traceIfFalse "User Value Failure"     $ isPKHGettingValue txOutputs (ortSellerPKH ort) (Ada.lovelaceValueOf $ ortAmount ort)
-      ; let e = traceIfFalse "Profit Value Failure"   $ isPKHGettingValue txOutputs profitPKH (Ada.lovelaceValueOf $ ortProfit ort)
-      ; let f = traceIfFalse "Value Is At Minimum"    $ Value.geq validatingValue (minimumValue + (Ada.lovelaceValueOf $ irtAmount irt))
-      ; let g = traceIfFalse "Incoming Datum Failure" $ isEmbeddedDatum datum info contOutputs
-      ;         traceIfFalse "Error: Remove Endpoint" $ all (==True) [a,b,c,d,e,f,g]
+      ; let c = traceIfFalse "Cont Value Failure"     $ isValueContinuing contOutputs (validatingValue - outboundADA)
+      ; let d = traceIfFalse "User Value Failure"     $ isPKHGettingValue txOutputs userPKH outboundADA
+      ; let e = traceIfFalse "Value Is At Minimum"    $ Value.geq validatingValue (minimumValue + outboundADA)
+      ; let f = traceIfFalse "Incoming Datum Failure" isDatumCorrect
+      ;         traceIfFalse "Error: Remove Endpoint" $ all (==True) [a,b,c,d,e,f]
       }
     (Add irt) -> do
-      { let a = traceIfFalse "User Signature Failure" $ txSignedBy info (irtSellerPKH irt)
+      { let outboundADA = Ada.lovelaceValueOf $ irtAmount irt
+      ; let userPKH     = irtSellerPKH irt
+      ; let a = traceIfFalse "User Signature Failure" $ txSignedBy info userPKH
       ; let b = traceIfFalse "Script UTxO Failure"    $ isNScriptInputs txInputs (1 :: Integer)
-      ; let c = traceIfFalse "Cont Value Failure"     $ isValueContinuing contOutputs (validatingValue + (Ada.lovelaceValueOf $ irtAmount irt))
-      ; let d = traceIfFalse "Incoming Datum Failure" $ isEmbeddedDatum datum info contOutputs
+      ; let c = traceIfFalse "Cont Value Failure"     $ isValueContinuing contOutputs (validatingValue + outboundADA)
+      ; let d = traceIfFalse "Incoming Datum Failure" isDatumCorrect
       ;         traceIfFalse "Error: Add Endpoint"    $ all (==True) [a,b,c,d]
       }
     Close -> do
-      { let a = traceIfFalse "Profit Signature Failure" $ txSignedBy info profitPKH
-      ; let b = traceIfFalse "Profit Value Failure"     $ isPKHGettingValue txOutputs profitPKH minimumValue
-      ; let c = traceIfFalse "Value Is Not At Minimum"  $ validatingValue == minimumValue
-      ;         traceIfFalse "Error: Remove Endpoint"   $ all (==True) [a,b,c]
+      { let a = traceIfFalse "Signature Failure"       $ hasEnoughSigners info datum majorityParam
+      ; let b = traceIfFalse "Value Is Not At Minimum" $ validatingValue == minimumValue
+      ; let c = traceIfFalse "Script UTxO Failure"     $ isNScriptInputs txInputs (1 :: Integer)
+      ;         traceIfFalse "Error: Close Endpoint"   $ all (==True) [a,b,c]
+      }
+    Vote -> do
+      { let a = traceIfFalse "Signature Failure"      $ hasEnoughSigners info datum majorityParam
+      ; let b = traceIfFalse "Cont Value Failure"     $ isValueContinuing contOutputs validatingValue
+      ; let c = traceIfFalse "Incoming Datum Failure" $ isVoteOccurring || isMemberAdded || isMemberRemoved
+      ; let d = traceIfFalse "Script UTxO Failure"    $ isNScriptInputs txInputs (1 :: Integer)
+      ;         traceIfFalse "Error: Vote Endpoint"   $ all (==True) [a,b,c,d]
       }
   where
+    isDatumCorrect :: Bool
+    isDatumCorrect = 
+      case isEmbeddedDatum datum info contOutputs of
+        Nothing       -> False
+        Just embedded -> datum == embedded
+    
+    isMemberAdded :: Bool
+    isMemberAdded = 
+      case isEmbeddedDatum datum info contOutputs of
+        Nothing       -> False
+        Just embedded -> datum =+= embedded
+    
+    isMemberRemoved :: Bool
+    isMemberRemoved = 
+      case isEmbeddedDatum datum info contOutputs of
+        Nothing       -> False
+        Just embedded -> datum =-= embedded
+    
+    isVoteOccurring :: Bool
+    isVoteOccurring = 
+      case isEmbeddedDatum datum info contOutputs of
+        Nothing       -> False
+        Just embedded -> datum =?= embedded
+    
     info :: TxInfo
     info = scriptContextTxInfo context
 
@@ -110,8 +146,8 @@ mkValidator _ datum redeemer context =
     contOutputs :: [TxOut]
     contOutputs = getContinuingOutputs context
 
-    profitPKH :: PubKeyHash
-    profitPKH = cdtProfitPKH datum
+    majorityParam :: Integer
+    majorityParam = cdtMajority datum
 
     validatingValue :: Value
     validatingValue =

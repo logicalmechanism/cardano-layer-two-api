@@ -30,13 +30,14 @@ module CheckFuncs
   , isValueContinuing
   , isEmbeddedDatum
   , isPKHGettingValue
+  , hasEnoughSigners
   ) where
 import           PlutusTx.Prelude
 import qualified Plutus.V1.Ledger.Address as Address
 import           Ledger                   hiding (singleton)
-import           DataTypes                (CustomDatumType)
+import           DataTypes                (CustomDatumType (cdtProfitPKH), length')
 import qualified PlutusTx
-{- |
+{-
   Author   : The Ancient Kraken
   Copyright: 2022
   Version  : Rev 0
@@ -81,15 +82,44 @@ isNScriptInputs txInputs = loopInputs txInputs 0
 -------------------------------------------------------------------------------
 -- | Check if the incoming datum is the correct form.
 -------------------------------------------------------------------------------
-isEmbeddedDatum :: CustomDatumType -> TxInfo -> [TxOut] -> Bool
-isEmbeddedDatum _     _    []     = False
-isEmbeddedDatum datum info (x:xs) = 
+isEmbeddedDatum :: CustomDatumType -> TxInfo -> [TxOut] -> Maybe CustomDatumType
+isEmbeddedDatum _     _    []     = Nothing
+isEmbeddedDatum datum info (x:xs) =
   case txOutDatumHash x of
     Nothing -> isEmbeddedDatum datum info xs
-    Just dh -> 
+    Just dh ->
       case findDatum dh info of
-        Nothing        -> False
-        Just (Datum d) -> 
-          case PlutusTx.fromBuiltinData d of
-            Nothing       -> False
-            Just embedded -> datum == embedded
+        Nothing        -> Nothing
+        Just (Datum d) -> PlutusTx.fromBuiltinData d
+-------------------------------------------------------------------------------
+-- | Count the number of signers that are from the group
+-------------------------------------------------------------------------------
+hasEnoughSigners :: TxInfo -> CustomDatumType -> Integer -> Bool
+hasEnoughSigners info datum majorityParam = txWeight >= majority
+  where
+    txWeight :: Integer
+    txWeight = calculateWeight txSigners nodeGroup 0
+
+    txSigners :: [PubKeyHash]
+    txSigners = txInfoSignatories info
+
+    nodeGroup :: [PubKeyHash]
+    nodeGroup = cdtProfitPKH datum
+
+    majority :: Integer
+    majority = if amount < majorityParam then amount else majorityParam
+      where
+        amount :: Integer
+        amount = length' nodeGroup
+
+    calculateWeight :: [PubKeyHash] -> [PubKeyHash] -> Integer -> Integer
+    calculateWeight []               _             counter = counter
+    calculateWeight (signer:signers) signingGroup  counter
+      | checkSigneeInGroup signer signingGroup = calculateWeight signers signingGroup (counter + 1)
+      | otherwise                              = calculateWeight signers signingGroup counter
+        where
+          checkSigneeInGroup :: PubKeyHash -> [PubKeyHash] -> Bool
+          checkSigneeInGroup _ [] = False
+          checkSigneeInGroup pkh (vestor:vestors)
+            | pkh == vestor = True
+            | otherwise     = checkSigneeInGroup pkh vestors

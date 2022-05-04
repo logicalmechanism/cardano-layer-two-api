@@ -32,7 +32,9 @@ module DataTypes
   , OutboundRedeemerType
   , ortSellerPKH
   , ortAmount
+  , ortProfitPKH
   , ortProfit
+  , ortProof
   , InboundRedeemerType
   , irtSellerPKH
   , irtAmount
@@ -61,11 +63,12 @@ class Equiv a b where
   (=-=) :: a -> b -> Bool
   (=?=) :: a -> b -> Bool
 -------------------------------------------------------------------------------
--- | Custom data object for storing swap half data.
+-- | Outbound data ( user wants to leave )
 -------------------------------------------------------------------------------
 data OutboundRedeemerType = OutboundRedeemerType
   { ortSellerPKH :: !PubKeyHash
   , ortAmount    :: !Integer
+  , ortProfitPKH :: !PubKeyHash
   , ortProfit    :: !Integer
   , ortProof     :: !BuiltinByteString
   }
@@ -74,7 +77,7 @@ data OutboundRedeemerType = OutboundRedeemerType
 PlutusTx.unstableMakeIsData ''OutboundRedeemerType
 PlutusTx.makeLift           ''OutboundRedeemerType
 -------------------------------------------------------------------------------
--- | Custom data object for storing swap half data.
+-- | Inbound data ( user wants to enter )
 -------------------------------------------------------------------------------
 data InboundRedeemerType = InboundRedeemerType
   { irtSellerPKH :: !PubKeyHash

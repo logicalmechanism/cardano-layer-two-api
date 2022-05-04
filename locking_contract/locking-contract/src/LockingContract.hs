@@ -83,14 +83,15 @@ mkValidator _ datum redeemer context =
       ; let b = traceIfFalse "Script UTxO Failure"    $ isNScriptInputs txInputs (1 :: Integer)
       ; let c = traceIfFalse "Cont Value Failure"     $ isValueContinuing contOutputs (validatingValue - outboundADA)
       ; let d = traceIfFalse "User Value Failure"     $ isPKHGettingValue txOutputs userPKH outboundADA
-      ; let e = traceIfFalse "Value Is At Minimum"    $ Value.geq validatingValue (minimumValue + outboundADA)
-      ; let f = traceIfFalse "Incoming Datum Failure" isDatumCorrect
-      ;         traceIfFalse "Error: Remove Endpoint" $ all (==True) [a,b,c,d,e,f]
+      ; let e = traceIfFalse "Profit Value Failure"   $ isPKHGettingValue txOutputs (ortProfitPKH ort) (Ada.lovelaceValueOf $ ortProfit ort)
+      ; let f = traceIfFalse "Value Is At Minimum"    $ Value.geq validatingValue (minimumValue + outboundADA)
+      ; let g = traceIfFalse "Incoming Datum Failure" isDatumCorrect
+      ;         traceIfFalse "Error: Remove Endpoint" $ all (==True) [a,b,c,d,e,f,g]
       }
     (Add irt) -> do
       { let outboundADA = Ada.lovelaceValueOf $ irtAmount irt
       ; let userPKH     = irtSellerPKH irt
-      ; let a = traceIfFalse "User Signature Failure" $ txSignedBy info userPKH
+      ; let a = traceIfFalse "MultiSig Failure"       $ txSignedBy info userPKH && hasEnoughSigners info datum (1 :: Integer)
       ; let b = traceIfFalse "Script UTxO Failure"    $ isNScriptInputs txInputs (1 :: Integer)
       ; let c = traceIfFalse "Cont Value Failure"     $ isValueContinuing contOutputs (validatingValue + outboundADA)
       ; let d = traceIfFalse "Incoming Datum Failure" isDatumCorrect

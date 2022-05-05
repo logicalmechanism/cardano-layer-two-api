@@ -23,21 +23,56 @@ class TaskViewSet(viewsets.ModelViewSet):
     serializer_class = TaskSerializer
     permission_classes = [permissions.IsAuthenticated]
     
-    # # create a new account
-    # @action(methods=['post'], detail=False, permission_classes=[permissions.IsAuthenticated])
-    # def newTask(self, request):
-    #     """
-    #     /tasks/newTask/
+    # create a new task
+    @action(methods=['post'], detail=False, permission_classes=[permissions.IsAuthenticated])
+    def newTask(self, request):
+        """
+        /tasks/newTask/
 
-    #     @see: api.tests.TaskApiTest
+        @see: api.tests.TaskApiTest
 
-    #     Payload Format:
-    #     """
-    #     # No empty pkh
-    #     data = str(request.POST['payload'])
-    #     data = loads(bytes.fromhex(data))
-    #     good['data'] ='Success'
-    #     return Response(good)
+        Payload Format:
+        """
+        data = str(request.POST['payload'])
+        data = loads(bytes.fromhex(data))
+        # check payload
+        try:
+            num = int(data['number'])
+            if num < 0:
+                bad['data'] = "Missing Data"
+                return Response(bad)
+            pkhs = data['pkhs']
+            if type(pkhs) != list:
+                bad['data'] = 'Wrong Data Type'
+                return Response(bad)
+            if len(pkhs) == 0:
+                bad['data'] = "Missing Data"
+                return Response(bad)
+            if any(len(ele) == 0 for ele in pkhs) is True:
+                bad['data'] = "Missing Data"
+                return Response(bad)
+            cbor = data['cbor']
+            if type(cbor) != str:
+                bad['data'] = 'Wrong Data Type'
+                return Response(bad)
+            if cbor == '':
+                bad['data'] = "Missing Data"
+                return Response(bad)
+        except KeyError:
+            bad['data'] = "Missing Data"
+            return Response(bad)
+        # add data the task db
+        t = Task.objects.create(number=num,cbor=cbor)
+        acts = []
+        for pkh in pkhs:
+            try:
+                acts.append(Account.objects.get(pkh=pkh))
+            except:
+                pass
+        t.account.set(acts)
+        
+        good['data'] ='Success'
+        return Response(good)
     
     # merkle tree of a singleusers transactions
     @action(methods=['post'], detail=False, permission_classes=[permissions.IsAuthenticated])
@@ -199,10 +234,11 @@ class EntryViewSet(viewsets.ModelViewSet):
             return Response(noAccount)
         for entry in Entry.objects.filter(account=acct):
             value = entry.utxo.value
-            tkn = value.token
-            amt = value.amount
-            # dict of txid to value
-            utxos[entry.utxo.txId] = {tkn.pid: {tkn.name: amt}}
+            for val in value.all():
+                tkn = val.token
+                amt = val.amount
+                # dict of txid to value
+                utxos[entry.utxo.txId] = {tkn.pid: {tkn.name: amt}}
         # return 200 and the payload
         good['data'] = utxos
         return Response(good)
@@ -226,8 +262,9 @@ class EntryViewSet(viewsets.ModelViewSet):
         except:
             return Response(noAccount)
         for entry in Entry.objects.filter(account=acct):
-            if str(entry.utxo.value.token.pid) == "": # synthetic ada only
-                total += entry.utxo.value.amount
+            for value in entry.utxo.value.all():
+                if str(value.token.pid) == "": # synthetic ada only
+                    total += value.amount
         # return 200 and the payload
         good['data'] = total
         return Response(good)

@@ -148,8 +148,9 @@ def newUtxosWrapper(pkh:str, utxos:dict) -> bool:
             return False
         v = Value(token=t , amount=int(data[pid][name]))
         v.save()
-        u = UTxO(txId=str(utxo), value=v)
-        u.save() # fails on nonunique
+        u = UTxO.objects.create(txId=str(utxo))
+        u.value.set([v])
+        # u.save() # fails on nonunique
         e = Entry(account=a, utxo=u)
         e.save()
     return True

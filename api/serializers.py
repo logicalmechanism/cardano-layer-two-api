@@ -11,4 +11,4 @@ class EntrySerializer(serializers.HyperlinkedModelSerializer):
 class TaskSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Task
-        fields = ['cbor']
+        fields = ['number', 'cbor', 'account']

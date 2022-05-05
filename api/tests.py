@@ -11,8 +11,21 @@ class TaskApiTest(TestCase):
     def setUp(self):
         Account.objects.create(pkh="somepkhhere")
         Account.objects.create(pkh="anotherpkhhere")
-        
-
+    
+    def test_new_task(self):
+        test_data = dumps({
+            "number": 0,
+            "cbor": "testing",
+            "pkhs": ["somepkhhere"]
+        }).hex()
+        request = RequestFactory().post('/tasks/newTask/', {'payload': test_data})
+        view = TaskViewSet.newTask(self, request)
+        t = Task.objects.get(number=0)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 200)
+        self.assertEqual(view.data['data'], 'Success')
+        self.assertEqual(t.cbor, "testing")
+    
     def test_account_assign(self):
         user1 = Account.objects.get(pkh="somepkhhere")
         user2 = Account.objects.get(pkh="anotherpkhhere")
@@ -221,7 +234,7 @@ class NewUTxOApiTest(TestCase):
         self.assertEqual(view.data['status'], 200)
         self.assertEqual(view.data['data'], 'Success')
         self.assertEqual(len(Entry.objects.all()), 1)
-        self.assertEqual(Entry.objects.get(account=Account.objects.get(pkh="somepkhhere")).utxo.value.amount, 10)
+        self.assertEqual(Entry.objects.get(account=Account.objects.get(pkh="somepkhhere")).utxo.value.all()[0].amount, 10)
     
     def test_no_account(self):
         test_data = dumps({
@@ -307,7 +320,8 @@ class DeleteUTxOsApiTest(TestCase):
         Value.objects.create(token=token,amount=10).save()
         value = Value.objects.get(token=token)
         
-        UTxO.objects.create(txId="utxo1", value=value).save()
+        u = UTxO.objects.create(txId="utxo1")
+        u.value.set([value])
         utxo = UTxO.objects.get(txId="utxo1")
         
         Entry.objects.create(account=user, utxo=utxo).save()
@@ -331,7 +345,9 @@ class DeleteUTxOsApiTest(TestCase):
         Value.objects.create(token=token,amount=10).save()
         value = Value.objects.get(token=token)
         
-        UTxO.objects.create(txId="utxo1", value=value).save()
+        u = UTxO.objects.create(txId="utxo1")
+        u.value.set([value])
+
         utxo = UTxO.objects.get(txId="utxo1")
         
         Entry.objects.create(account=user, utxo=utxo).save()
@@ -355,7 +371,8 @@ class DeleteUTxOsApiTest(TestCase):
         Value.objects.create(token=token,amount=10).save()
         value = Value.objects.get(token=token)
         
-        UTxO.objects.create(txId="utxo1", value=value).save()
+        u = UTxO.objects.create(txId="utxo1")
+        u.value.set([value])
         utxo = UTxO.objects.get(txId="utxo1")
         
         Entry.objects.create(account=user, utxo=utxo).save()
@@ -389,7 +406,8 @@ class GetUTxOsApiTest(TestCase):
         Value.objects.create(token=token,amount=10).save()
         value = Value.objects.get(token=token)
         
-        UTxO.objects.create(txId="utxo1", value=value).save()
+        u = UTxO.objects.create(txId="utxo1")
+        u.value.set([value])
         utxo = UTxO.objects.get(txId="utxo1")
         
         Entry.objects.create(account=user, utxo=utxo).save()
@@ -434,7 +452,9 @@ class TotalAdaApiTest(TestCase):
         Value.objects.create(token=token,amount=10).save()
         value = Value.objects.get(token=token)
         
-        UTxO.objects.create(txId="utxo1", value=value).save()
+        u = UTxO.objects.create(txId="utxo1")
+        u.value.set([value])
+
         utxo = UTxO.objects.get(txId="utxo1")
         
         Entry.objects.create(account=user, utxo=utxo).save()

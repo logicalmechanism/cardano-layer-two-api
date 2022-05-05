@@ -10,7 +10,7 @@ class Value(models.Model):
 
 class UTxO(models.Model):
     txId = models.CharField(max_length=128, unique=True)
-    value = models.ForeignKey(Value, on_delete=models.CASCADE)
+    value = models.ManyToManyField(Value)
 
 class Account(models.Model):
     pkh = models.CharField(max_length=128, unique=True)

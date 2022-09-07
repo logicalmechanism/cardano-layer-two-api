@@ -274,20 +274,34 @@ class EntryViewSet(viewsets.ModelViewSet):
         Payload Format: Public Key Hash (hexdecimal)
 
         Chain Agnostic PKH
+
+        Returns all UTxOs attached to some account.
         """
-        utxos = {}
-        print(request.POST['payload'])
+        # check for missing data
         try:
-            acct = Account.objects.get(pkh=request.POST['payload'])
+            pkh = str(request.POST['payload'])
+        except KeyError:
+            bad['data'] = "Missing Data"
+            return Response(bad)
+        
+        # must have an account to get utxos
+        try:
+            acct = Account.objects.get(pkh=pkh)
         except:
             return Response(noAccount)
+        
+        # loop the entries for the account and return a value of all the data
+        utxos = {}
         for entry in Entry.objects.filter(account=acct):
+            # loop all tokens in value
             value = entry.utxo.value
             for val in value.all():
+                
                 tkn = val.token
                 amt = val.amount
                 # dict of txid to value
                 utxos[entry.utxo.txId] = {tkn.pid: {tkn.name: amt}}
+        
         # return 200 and the payload
         good['data'] = utxos
         return Response(good)

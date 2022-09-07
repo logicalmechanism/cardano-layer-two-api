@@ -494,11 +494,22 @@ class DeleteUTxOsApiTest(TestCase):
 class GetUTxOsApiTest(TestCase):
     """
     Testing the getUTxOs api endpoint.
+
+    /entries/getUTxOs/
     """
+    test_pkh1 = "54b22504fb5f504d5e1eaefa915940957ae530aa854bb8c6b403e80c"
+    
+    def test_no_payload(self):
+        request = RequestFactory().post('/entries/getUTxOs/', {})
+        view = EntryViewSet.newUTxO(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 400)
+        self.assertEqual(view.data['data'], 'Missing Data')
+    
     def test_getting_utxos(self):
         # Create some fake data
-        Account.objects.create(pkh="somepkhhere").save()
-        user = Account.objects.get(pkh="somepkhhere")
+        Account.objects.create(pkh=self.test_pkh1).save()
+        user = Account.objects.get(pkh=self.test_pkh1)
         
         Token.objects.create(pid="", name="").save() # ada
         token = Token.objects.get(pid="")
@@ -516,12 +527,12 @@ class GetUTxOsApiTest(TestCase):
         view = EntryViewSet.getUTxOs(self, request)
         self.assertEqual(view.status_code, 200)
         self.assertEqual(view.data['status'], 200)
-        self.assertEqual(view.data['data'], {'utxo1': {'': {'': 10}}})
+        self.assertEqual(view.data['data'], {'utxo1': {'': {'': 10}}}) # it returns the created utxo
     
     def test_no_entries(self):
         # Create some fake data
-        Account.objects.create(pkh="somepkhhere").save()
-        user = Account.objects.get(pkh="somepkhhere")
+        Account.objects.create(pkh=self.test_pkh1).save()
+        user = Account.objects.get(pkh=self.test_pkh1)
         
         request = RequestFactory().post('/entries/getUTxOs/', {'payload': user.pkh})
         view = EntryViewSet.getUTxOs(self, request)

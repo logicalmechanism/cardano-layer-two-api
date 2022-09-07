@@ -202,8 +202,8 @@ class NewAccountApiTest(TestCase):
         request = RequestFactory().post('/entries/newAccount/', {'payload': self.test_pkh2})
         view = EntryViewSet.newAccount(self, request)
         self.assertEqual(view.status_code, 200)
-        self.assertEqual(view.data['status'], 400)
-        self.assertEqual(view.data['data'], 'Incorrect Length Key')
+        self.assertEqual(view.data['status'], 200)
+        self.assertEqual(view.data['data'], 'Success')
 
         request = RequestFactory().post('/entries/newAccount/', {'payload': self.test_pkh3})
         view = EntryViewSet.newAccount(self, request)

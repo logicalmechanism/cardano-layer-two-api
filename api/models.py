@@ -19,7 +19,6 @@ class UTxO(models.Model):
     txId     = models.CharField(max_length=128, unique=True)
     value    = models.ManyToManyField(Value)
     datum    = models.ManyToManyField(Datum)
-    
 
 class Account(models.Model):
     pkh = models.CharField(max_length=128, unique=True)
@@ -32,3 +31,4 @@ class Task(models.Model):
     number  = models.IntegerField()
     cbor    = models.TextField()
     account = models.ManyToManyField(Account)
+

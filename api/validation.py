@@ -1,7 +1,12 @@
 from api.models import Entry, Account, UTxO
 import subprocess
 
-def didPkhSignTx(sig:str, key:str) -> bool:
+def didPkhSignTx(sig:str, key:str) -> str:
+    """
+    Use a sub process to run a node script that will verify the signed data
+    using the cip08 library. A successful signature will return the signer
+    of the data. This can be used to confirm the pkh of the signer in detail.
+    """
     # sig must sign the txId which equals hashTxBody(txBody)
     # pkh on sig must equal pkh provided
     func = [

@@ -15,10 +15,15 @@ cd api
 npm install
 ```
 
-Migrate the db. May need to do a force migrate.
+Migrate the db. May need to do a force migrate with sync db.
 ```
 python manage.py makemigrations
 python manage.py migrate
+```
+
+Create a api token from a user, typically a superuser.
+```
+python manage.py drf_create_token <username>
 ```
 
 Run api server

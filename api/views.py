@@ -7,6 +7,9 @@ from api.serializers import EntrySerializer, TaskSerializer
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from cbor2 import dumps, loads
+###############################################################################
+#
+###############################################################################
 
 good = { 'status': 200, 'data': '' }
 bad  = { 'status': 400, 'data': 'Bad Data' }
@@ -15,6 +18,9 @@ accountExist  = { 'status': 409, 'data': 'Account Already Exists' }
 utxoExist  = { 'status': 409, 'data': 'UTxO Already Exists' }
 noAccount  = { 'status': 401, 'data': 'No Account Exists' }
 
+###############################################################################
+#
+###############################################################################
 class TaskViewSet(viewsets.ModelViewSet):
     """
     API endpoints for the task db of tasks.
@@ -130,7 +136,7 @@ class EntryViewSet(viewsets.ModelViewSet):
     serializer_class = EntrySerializer
     permission_classes = [permissions.IsAuthenticated]
 
-    # create a new account
+    # create a new account with a pkh
     @action(methods=['post'], detail=False, permission_classes=[permissions.IsAuthenticated])
     def newAccount(self, request):
         """
@@ -140,18 +146,27 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         Payload Format: Public Key Hash (hexdecimal)
 
-        Chain Agnostic PKH
+        length 56, Chain Agnostic PKH
         """
-        # No empty pkh
-        pkh = str(request.POST['payload'])
-        if pkh == '':
+        # check for missing data
+        try:
+            pkh = str(request.POST['payload'])
+        except KeyError:
             bad['data'] = "Missing Data"
             return Response(bad)
+
+        # payment public key hash only, length 56
+        if len(pkh) != 56:
+            bad['data'] = "Incorrect Length Key"
+            return Response(bad)
+        
         # Unique accounts only
         try:
             Account(pkh=pkh).save()
         except:
             return Response(accountExist)
+        
+        # good to go
         good['data'] ='Success'
         return Response(good)
 
@@ -159,32 +174,48 @@ class EntryViewSet(viewsets.ModelViewSet):
     @action(methods=['post'], detail=False, permission_classes=[permissions.IsAuthenticated])
     def newUTxO(self, request):
         """
-        /entries/newUTxO
+        /entries/newUTxO/
 
         @see: api.tests.NewUTxOApiTest
 
         Payload Format: CBOR
         
-        {pkh, utxos} -> {'pkh':'', utxos:{'utxo1': {pid1:{name1:amt1}}, 'utxo2': {pid2:{name2:amt2}}}
+        {pkh, utxos} -> {'pkh':'', 'utxos':{'tx_hash#1': {'pid1':{'tkn1':amt1}}, 'tx_hash#2': {'pid2':{'tkn2':amt2}}}
+
+        The UTxO tx hashes are blake2b. Pids and tkns follow layer1 conventions.
         """
+        try:
+            data = str(request.POST['payload'])
+        except KeyError:
+            bad['data'] = "Missing Data"
+            return Response(bad)
+        
         # Dict of utxos and amounts
-        data = str(request.POST['payload'])
         data = loads(bytes.fromhex(data))
+        
         # check data type
         if type(data) != dict:
             bad['data'] = 'Wrong Data Type'
             return Response(bad)
-        pkh = str(data['pkh'])
-        utxos = data['utxos']
+        
+        try:
+            pkh = str(data['pkh'])
+            utxos = data['utxos']
+        except KeyError:
+            bad['data'] = 'Missing Fields'
+            return Response(bad)
+        
         # must have utxos
         if len(utxos) == 0:
             bad['data'] = 'Missing Fields'
             return Response(bad)
-        # validate
+        
+        # validate the incoming utxo
         if newUtxosWrapper(pkh, utxos) is True:
             good['data'] = 'Success'
             return Response(good)
         else:
+            # this fail is like 3 different possible failures.
             bad['data'] = 'Fail'
             return Response(bad)
     
@@ -228,6 +259,7 @@ class EntryViewSet(viewsets.ModelViewSet):
         Chain Agnostic PKH
         """
         utxos = {}
+        print(request.POST['payload'])
         try:
             acct = Account.objects.get(pkh=request.POST['payload'])
         except:
@@ -243,7 +275,7 @@ class EntryViewSet(viewsets.ModelViewSet):
         good['data'] = utxos
         return Response(good)
     
-    # Return all utxos from a single pkh
+    # Return the total ada from a single pkh
     @action(methods=['POST'], detail=False, permission_classes=[permissions.IsAuthenticated])
     def totalAda(self, request):
         """
@@ -269,7 +301,7 @@ class EntryViewSet(viewsets.ModelViewSet):
         good['data'] = total
         return Response(good)
     
-    # hash some object
+    # hash some tx body object
     @action(methods=['POST'], detail=False, permission_classes=[permissions.IsAuthenticated])
     def hashTx(self, request):
         """

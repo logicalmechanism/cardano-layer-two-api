@@ -126,30 +126,46 @@ def sendTxWrapper(inputs:dict, outputs:dict, txId:str) -> bool:
     return True
 
 def newUtxosWrapper(pkh:str, utxos:dict) -> bool:
+    """
+    Find an account if it exists.
+    """
     try:
         a = Account.objects.get(pkh=pkh)
     except:
         return False
+    
     # add in all utxos and fail if any fail
     for utxo in utxos:
         data = utxos[utxo]
+        
         # must be dict
         if type(data) != dict:
             return False
-        pid = list(data.keys())[0]
+        
+        # make sure the pid object is correct
+        try:
+            pid = list(data.keys())[0]
+        except IndexError:
+            return False
+        
         # must be dict
         if type(data[pid]) != dict:
             return False
+        
         name = list(data[pid].keys())[0]
         t = Token(pid=pid, name=name)
         t.save()
+        
         # positive non zero integers
         if int(data[pid][name]) < 1:
             return False
+        
         v = Value(token=t , amount=int(data[pid][name]))
         v.save()
+        
         u = UTxO.objects.create(txId=str(utxo))
         u.value.set([v])
+        
         # u.save() # fails on nonunique
         e = Entry(account=a, utxo=u)
         e.save()

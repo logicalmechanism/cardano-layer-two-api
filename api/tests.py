@@ -132,7 +132,6 @@ class ValidateApiTest(TestCase):
             "fee":1,
         }
         txId = hashTxBody(txBody)
-        # print(txId)
         txSign = {
             "pkh":"cdb78039cda276a7e8e306109fd7be5cbbb5fb6f6b55cdb5a0e46035",
             "data": txId,
@@ -188,30 +187,58 @@ class ValidateApiTest(TestCase):
 class NewAccountApiTest(TestCase):
     """
     Testing the newAccount api endpoint.
-    """
-    def test_new_account(self):
-        request = RequestFactory().post('/entries/newAccount/', {'payload': "somepkhhere"})
-        view = EntryViewSet.newAccount(self, request)
-        self.assertEqual(view.status_code, 200)
-        self.assertEqual(Account.objects.get(pkh='somepkhhere').pkh, "somepkhhere")
-        self.assertEqual(view.data['status'], 200)
-        self.assertEqual(view.data['data'], 'Success')
     
-    def test_empty_account(self):
-        request = RequestFactory().post('/entries/newAccount/', {'payload': ""})
+    /entries/newAccount/
+    """
+
+    test_pkh1 = "54b22504fb5f504d5e1eaefa915940957ae530aa854bb8c6b403e80c"
+    test_pkh2 = "2ec0b67c151ef515d3ba0b46a08b160737e2cd40f8642112d33b9ecf51edb64dc602643d7964f0412ed4f61a5769c8734542618e9bf8f7e0"
+    test_pkh3 = ""
+    
+    def test_no_payload(self):
+        request = RequestFactory().post('/entries/newAccount/', {})
         view = EntryViewSet.newAccount(self, request)
         self.assertEqual(view.status_code, 200)
         self.assertEqual(view.data['status'], 400)
         self.assertEqual(view.data['data'], 'Missing Data')
-    
-    def test_double_account(self):
-        request = RequestFactory().post('/entries/newAccount/', {'payload': "somepkhhere"})
+
+    def test_payload_length(self):
+        request = RequestFactory().post('/entries/newAccount/', {'payload': self.test_pkh1})
         view = EntryViewSet.newAccount(self, request)
         self.assertEqual(view.status_code, 200)
-        self.assertEqual(Account.objects.get(pkh='somepkhhere').pkh, "somepkhhere")
+        self.assertEqual(Account.objects.get(pkh=self.test_pkh1).pkh, self.test_pkh1)
         self.assertEqual(view.data['status'], 200)
         self.assertEqual(view.data['data'], 'Success')
-        request = RequestFactory().post('/entries/newAccount/', {'payload': "somepkhhere"})
+
+        request = RequestFactory().post('/entries/newAccount/', {'payload': self.test_pkh2})
+        view = EntryViewSet.newAccount(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 400)
+        self.assertEqual(view.data['data'], 'Incorrect Length Key')
+
+        request = RequestFactory().post('/entries/newAccount/', {'payload': self.test_pkh3})
+        view = EntryViewSet.newAccount(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 400)
+        self.assertEqual(view.data['data'], 'Incorrect Length Key')
+
+    def test_new_account(self):
+        request = RequestFactory().post('/entries/newAccount/', {'payload': self.test_pkh1})
+        view = EntryViewSet.newAccount(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(Account.objects.get(pkh=self.test_pkh1).pkh, self.test_pkh1)
+        self.assertEqual(view.data['status'], 200)
+        self.assertEqual(view.data['data'], 'Success')
+    
+    def test_double_account(self):
+        request = RequestFactory().post('/entries/newAccount/', {'payload': self.test_pkh1})
+        view = EntryViewSet.newAccount(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(Account.objects.get(pkh=self.test_pkh1).pkh, self.test_pkh1)
+        self.assertEqual(view.data['status'], 200)
+        self.assertEqual(view.data['data'], 'Success')
+
+        request = RequestFactory().post('/entries/newAccount/', {'payload': self.test_pkh1})
         view = EntryViewSet.newAccount(self, request)
         self.assertEqual(view.data['status'], 409)
         self.assertEqual(view.data['data'], 'Account Already Exists')
@@ -219,28 +246,70 @@ class NewAccountApiTest(TestCase):
 class NewUTxOApiTest(TestCase):
     """
     Testing the newUTxO api endpoint.
-    """
-    def setUp(self):
-        Account.objects.create(pkh="somepkhhere")
     
+    /entries/newUTxO/
+    """
+    test_pkh1 = "54b22504fb5f504d5e1eaefa915940957ae530aa854bb8c6b403e80c"
+    data1 = {
+        "pkh":test_pkh1,
+        "utxos": {
+            "utxo1": {
+                "": {
+                    "": 10
+                }
+            }
+        }
+    }
+    data2 = {
+        "pkh":'test_pkh1',
+        "utxos": {
+            "utxo1": {
+                "": {
+                    "": 10
+                }
+            }
+        }
+    }
+    data3 = {
+        "pkh":test_pkh1,
+        "utxos": {
+            "utxo1": {
+                "": {
+                    "": 10
+                }
+            },
+            "utxo1": {
+                "": {
+                    "": 10
+                }
+            }
+        }
+    }
+
+    def setUp(self):
+        Account.objects.create(pkh=self.test_pkh1)
+    
+    def test_no_payload(self):
+        request = RequestFactory().post('/entries/newUTxO/', {})
+        view = EntryViewSet.newUTxO(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 400)
+        self.assertEqual(view.data['data'], 'Missing Data')
+
     def test_new_utxo(self):
-        test_data = dumps({
-            "pkh":"somepkhhere",
-            "utxos":{"utxo1":{"":{"":10}}}
-        }).hex()
+        test_data = dumps(self.data1).hex()
         request = RequestFactory().post('/entries/newUTxO/', {'payload': test_data})
         view = EntryViewSet.newUTxO(self, request)
         self.assertEqual(view.status_code, 200)
         self.assertEqual(view.data['status'], 200)
         self.assertEqual(view.data['data'], 'Success')
+        # only creates a single entry
         self.assertEqual(len(Entry.objects.all()), 1)
-        self.assertEqual(Entry.objects.get(account=Account.objects.get(pkh="somepkhhere")).utxo.value.all()[0].amount, 10)
+        # find all entries from an account and check that the first utxo hash a value of 10.
+        self.assertEqual(Entry.objects.get(account=Account.objects.get(pkh=self.test_pkh1)).utxo.value.all()[0].amount, 10)
     
     def test_no_account(self):
-        test_data = dumps({
-            "pkh":"somekhhere",
-            "utxos":{"utxo1":{"":{"":10}}}
-        }).hex()
+        test_data = dumps(self.data2).hex()
         request = RequestFactory().post('/entries/newUTxO/', {'payload': test_data})
         view = EntryViewSet.newUTxO(self, request)
         self.assertEqual(view.status_code, 200)
@@ -249,18 +318,24 @@ class NewUTxOApiTest(TestCase):
         self.assertEqual(len(Entry.objects.all()), 0)
     
     def test_double_add(self):
-        test_data = dumps({
-            "pkh":"somepkhhere",
-            "utxos":{"utxo1":{"":{"":10}},"utxo1":{"":{"":10}}}
-        }).hex()
+        test_data = dumps(self.data3).hex()
         request = RequestFactory().post('/entries/newUTxO/', {'payload': test_data})
         view = EntryViewSet.newUTxO(self, request)
         self.assertEqual(view.status_code, 200)
         self.assertEqual(view.data['status'], 200)
         self.assertEqual(view.data['data'], 'Success')
+        # only add one valid utxo
         self.assertEqual(len(Entry.objects.all()), 1)
     
     def test_bad_data(self):
+        test_data = dumps({}).hex()
+        request = RequestFactory().post('/entries/newUTxO/', {'payload': test_data})
+        view = EntryViewSet.newUTxO(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 400)
+        self.assertEqual(view.data['data'], 'Missing Fields')
+        self.assertEqual(len(Entry.objects.all()), 0)
+
         test_data = dumps({
             "pkh":"somekhhere",
             "utxos":[]
@@ -283,8 +358,9 @@ class NewUTxOApiTest(TestCase):
         self.assertEqual(view.data['data'], 'Missing Fields')
         self.assertEqual(len(Entry.objects.all()), 0)
 
+        # no token name or amt
         test_data = dumps({
-            "pkh":"somekhhere",
+            "pkh":self.test_pkh1,
             "utxos": {"":{}}
         }).hex()
         request = RequestFactory().post('/entries/newUTxO/', {'payload': test_data})
@@ -294,8 +370,9 @@ class NewUTxOApiTest(TestCase):
         self.assertEqual(view.data['data'], 'Fail')
         self.assertEqual(len(Entry.objects.all()), 0)
 
+        # bad value
         test_data = dumps({
-            "pkh":"somekhhere",
+            "pkh":self.test_pkh1,
             "utxos": {"":{"":0}}
         }).hex()
         request = RequestFactory().post('/entries/newUTxO/', {'payload': test_data})
@@ -304,7 +381,6 @@ class NewUTxOApiTest(TestCase):
         self.assertEqual(view.data['status'], 400)
         self.assertEqual(view.data['data'], 'Fail')
         self.assertEqual(len(Entry.objects.all()), 0)
-
 
 class DeleteUTxOsApiTest(TestCase):
     """
@@ -389,7 +465,6 @@ class DeleteUTxOsApiTest(TestCase):
         self.assertEqual(view.data['status'], 200)
         self.assertEqual(view.data['data'], 'Success')
         self.assertEqual(len(Entry.objects.all()), 1)
-
 
 class GetUTxOsApiTest(TestCase):
     """
@@ -484,7 +559,6 @@ class TotalAdaApiTest(TestCase):
         self.assertEqual(view.data['status'], 401)
         self.assertEqual(view.data['data'], 'No Account Exists')
 
-
 class HashingApiTest(TestCase):
     """"
     Testing for the hash api endpoint.
@@ -519,4 +593,3 @@ class HashingApiTest(TestCase):
         self.assertEqual(view.status_code, 200)
         self.assertEqual(view.data['status'], 400)
         self.assertEqual(view.data['data'], 'Wrong Data Type')
-

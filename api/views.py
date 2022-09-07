@@ -215,7 +215,7 @@ class EntryViewSet(viewsets.ModelViewSet):
             good['data'] = 'Success'
             return Response(good)
         else:
-            # this fail is like 3 different possible failures.
+            # this fail is like 3+ different possible failures.
             bad['data'] = 'Fail'
             return Response(bad)
     
@@ -229,21 +229,38 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         Payload Format: CBOR
         
-        {pkh, utxos} -> {'pkh':'', utxos: ['utxo1', 'utxo2']}
+        {pkh, utxos} -> {'pkh':'', 'utxos': ['tx_hash#1', 'tx_hash#2']}
+
+        Delete a list of utxos from some account.
         """
+        # may sure there is data
+        try:
+            data = str(request.POST['payload'])
+        except KeyError:
+            bad['data'] = "Missing Data"
+            return Response(bad)
+        
         # List of UTxOs to Delete from an Account
-        data = str(request.POST['payload'])
         data = loads(bytes.fromhex(data))
+        
         # check for correct data structure
         if type(data) != dict:
             bad['data'] = 'Wrong Data Type'
             return Response(bad)
-        pkh = str(data['pkh'])
-        utxos = data['utxos']
+        
+        # check if object has correct data
+        try:
+            pkh = str(data['pkh'])
+            utxos = data['utxos']
+        except KeyError:
+            bad['data'] = 'Missing Fields'
+            return Response(bad)
+
         if deleteUtxosWrapper(pkh, utxos) is True:
             good['data'] = 'Success'
             return Response(good)
         else:
+            # this can only fail wit a no account
             return Response(noAccount)
     
     # Return all utxos from a single pkh

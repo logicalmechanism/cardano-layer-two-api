@@ -386,12 +386,14 @@ class DeleteUTxOsApiTest(TestCase):
     """
     Testing the deleteUTxOs api endpoint.
     """
+    test_pkh1 = "54b22504fb5f504d5e1eaefa915940957ae530aa854bb8c6b403e80c"
+
     def setUp(self):
-        Account.objects.create(pkh="somepkhhere")
+        Account.objects.create(pkh=self.test_pkh1)
         Token.objects.create(pid="", name="")
 
     def test_deleting_utxos(self):
-        user = Account.objects.get(pkh="somepkhhere")
+        user = Account.objects.get(pkh=self.test_pkh1)
         token = Token.objects.get(pid="")
         Value.objects.create(token=token,amount=10).save()
         value = Value.objects.get(token=token)
@@ -404,7 +406,7 @@ class DeleteUTxOsApiTest(TestCase):
         self.assertEqual(len(Entry.objects.all()), 1)
 
         test_data = dumps({
-            "pkh":"somepkhhere",
+            "pkh":self.test_pkh1,
             "utxos":["utxo1"]
         }).hex()
 
@@ -415,8 +417,15 @@ class DeleteUTxOsApiTest(TestCase):
         self.assertEqual(view.data['data'], 'Success')
         self.assertEqual(len(Entry.objects.all()), 0)
     
+    def test_no_payload(self):
+        request = RequestFactory().post('/entries/deleteUTxOs/', {})
+        view = EntryViewSet.newAccount(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 400)
+        self.assertEqual(view.data['data'], 'Missing Data')
+
     def test_bad_data_utxos(self):
-        user = Account.objects.get(pkh="somepkhhere")
+        user = Account.objects.get(pkh=self.test_pkh1)
         token = Token.objects.get(pid="")
         Value.objects.create(token=token,amount=10).save()
         value = Value.objects.get(token=token)
@@ -433,16 +442,32 @@ class DeleteUTxOsApiTest(TestCase):
             "pkh":"somephhere",
             "utxos":["utxo1"]
         }).hex()
-        
         request = RequestFactory().post('/entries/deleteUTxOs/', {'payload': test_data})
         view = EntryViewSet.deleteUTxOs(self, request)
         self.assertEqual(view.status_code, 200)
         self.assertEqual(view.data['status'], 401)
         self.assertEqual(view.data['data'], 'No Account Exists')
         self.assertEqual(len(Entry.objects.all()), 1)
-    
+
+        test_data = dumps([]).hex()
+        request = RequestFactory().post('/entries/deleteUTxOs/', {'payload': test_data})
+        view = EntryViewSet.deleteUTxOs(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 400)
+        self.assertEqual(view.data['data'], 'Wrong Data Type')
+        self.assertEqual(len(Entry.objects.all()), 1)
+
+        test_data = dumps({}).hex()
+        request = RequestFactory().post('/entries/deleteUTxOs/', {'payload': test_data})
+        view = EntryViewSet.deleteUTxOs(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 400)
+        self.assertEqual(view.data['data'], 'Missing Fields')
+        self.assertEqual(len(Entry.objects.all()), 1)
+
     def test_no_utxos(self):
-        user = Account.objects.get(pkh="somepkhhere")
+        # deleting something that doesn't exist gives a success but nothing is deleted
+        user = Account.objects.get(pkh=self.test_pkh1)
         token = Token.objects.get(pid="")
         Value.objects.create(token=token,amount=10).save()
         value = Value.objects.get(token=token)
@@ -455,7 +480,7 @@ class DeleteUTxOsApiTest(TestCase):
         self.assertEqual(len(Entry.objects.all()), 1)
 
         test_data = dumps({
-            "pkh":"somepkhhere",
+            "pkh":self.test_pkh1,
             "utxos":["utxo2"]
         }).hex()
         

@@ -127,7 +127,11 @@ def sendTxWrapper(inputs:dict, outputs:dict, txId:str) -> bool:
 
 def newUtxosWrapper(pkh:str, utxos:dict) -> bool:
     """
-    Find an account if it exists.
+    Find an account if it exists. Loop all the utxos and check for correct
+    data inputs. Each utxo creates a value that is attached an account as
+    an entry.
+
+    Accounts that can not be found fail new utxos.
     """
     try:
         a = Account.objects.get(pkh=pkh)
@@ -152,6 +156,7 @@ def newUtxosWrapper(pkh:str, utxos:dict) -> bool:
         if type(data[pid]) != dict:
             return False
         
+        # can this fail?
         name = list(data[pid].keys())[0]
         t = Token(pid=pid, name=name)
         t.save()
@@ -166,16 +171,24 @@ def newUtxosWrapper(pkh:str, utxos:dict) -> bool:
         u = UTxO.objects.create(txId=str(utxo))
         u.value.set([v])
         
-        # u.save() # fails on nonunique
         e = Entry(account=a, utxo=u)
         e.save()
     return True
 
 def deleteUtxosWrapper(pkh:str, utxos:list) -> bool:
+    """
+    Delete every entry object that matches this account and is attached to a
+    utxo contained in the list of utxos.
+
+    Failing here means no account was found.
+    """
+    # the account must exist
     try:
         acct = Account.objects.get(pkh=pkh)
     except:
         return False
+    
+    # delete if found else just pass right by
     for entry in Entry.objects.filter(account=acct):
         if str(entry.utxo.txId) in utxos:
                 entry.utxo.delete()

@@ -157,7 +157,7 @@ class EntryViewSet(viewsets.ModelViewSet):
             return Response(bad)
 
         # payment public key hash only, length 56
-        if len(pkh) != 56:
+        if len(pkh) < 56:
             bad['data'] = "Incorrect Length Key"
             return Response(bad)
         
@@ -428,7 +428,7 @@ class EntryViewSet(viewsets.ModelViewSet):
         [txBody, [txSign], contract] -> [
             {inputs:{}, outputs:{}, fee:0}, 
             [
-                {pkh:"", data:"tx_body_hash", sig:"pkh_sig_of_data"}
+                {pkh:"", data:"tx_body_hash", sig:"pkh_sig_of_data", "key":"key_of_sig"}
             ], 
             'smart_contract'
             ]

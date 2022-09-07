@@ -77,7 +77,7 @@ class ValidateApiTest(TestCase):
     """
     Testing the validate api endpoint.
     """
-    test_pkh1 = "54b22504fb5f504d5e1eaefa915940957ae530aa854bb8c6b403e80c"
+    test_pkh1 = "00f81595a5e215c4cc63ec82a0790e66c6b109033bc34e23c03cd756eb57e3e14dcee6ba8f48b97044ca868b4ee017d04ecc792de386beab74"
     test_pkh2 = "b5b5ae8e050355c7cc64415468c0ce135f44355c312cedf5474235f2"
     test_pkh3 = "9bd662da31d27afa412d57d1705b7c0e3be4c5ef2e73c1b228c763d3"
 
@@ -127,7 +127,6 @@ class ValidateApiTest(TestCase):
         self.assertEqual(view.data['data'], 'Wrong Data Type')
     
     def test_validate(self):
-
         test_data = dumps({
             "pkh":self.test_pkh1,
             "utxos":{"utxo1":{"":{"":10}}}
@@ -148,7 +147,8 @@ class ValidateApiTest(TestCase):
         txSign = {
             "pkh": self.test_pkh1,
             "data": txId,
-            "sig": "845869a30127045820167b1ececd537d48298ee532952cff2dd13d2c565cb61c7ba9ae6317c06346dd6761646472657373583900cdb78039cda276a7e8e306109fd7be5cbbb5fb6f6b55cdb5a0e460356a87912a7ea1eee216e716b07d2718ed81b3f602240b14840b2b2bb1a166686173686564f45820934d19bdcc1eed3bc7388074a5ae951c89bb867fda1795d7221a4b0565748bcf58402bba79fb2feeb6dc3e2ff312539e953d952aa31fc557caa376b3bd0ea8f16f835e071786d326d3a28e58d54318fd7ce3fb89ff00d66b5478652151efb5f8c70d"
+            "sig": "845846a201276761646472657373583900f81595a5e215c4cc63ec82a0790e66c6b109033bc34e23c03cd756eb57e3e14dcee6ba8f48b97044ca868b4ee017d04ecc792de386beab74a166686173686564f4589ca366696e70757473a1657574786f31a0676f757470757473a278386235623561653865303530333535633763633634343135343638633063653133356634343335356333313263656466353437343233356632a160a1600478383962643636326461333164323761666134313264353764313730356237633065336265346335656632653733633162323238633736336433a160a16005636665650158408df6874ba11e53881ea5be7904020eebfde4ef0cc3dffb2aef0ca41e64964ae1bfbe165eef08059ff89348d7093e2eb8c5bf8f7ff7a1357b62df30030af41006",
+            "key": "a4010103272006215820682631f4e8e60860cb3db3870cc4e0697e8783535e0a455409cf2fc35a3754fd"
         }
         
         test_data = dumps([
@@ -158,45 +158,20 @@ class ValidateApiTest(TestCase):
         ]).hex()
         request = RequestFactory().post('/entries/validate/', {'payload': test_data})
         view = EntryViewSet.validate(self, request)
-        print(view.data)
-        # self.assertEqual(view.status_code, 200)
-        # self.assertEqual(view.data['status'], 200)
-        # self.assertEqual(view.data['data'], 'Success')
-    
-    # def test_always_fails(self):
-        # test_data = dumps({
-        #     "pkh":"cdb78039cda276a7e8e306109fd7be5cbbb5fb6f6b55cdb5a0e46035",
-        #     "utxos":{"utxo1":{"":{"":10}}}
-        # }).hex()
-        # request = RequestFactory().post('/entries/newUTxO/', {'payload': test_data})
-        # view = EntryViewSet.newUTxO(self, request)
-        # txBody = {
-        #     "inputs":{
-        #         "utxo1":10
-        #     },
-        #     "outputs":{
-        #         "cdb78039cda276a7e8e306109fd7be5cbbb5fb6f6b55cdb5a0e46035": 4,
-        #         "anotherpkhhere": 5
-        #     },
-        #     "fee":1,
-        # }
-        # txId = hashTxBody(txBody)
-        # txSign = {
-        #     "pkh":"cdb78039cda276a7e8e306109fd7be5cbbb5fb6f6b55cdb5a0e46035",
-        #     "data": txId,
-        #     "sig": "845869a30127045820167b1ececd537d48298ee532952cff2dd13d2c565cb61c7ba9ae6317c06346dd6761646472657373583900cdb78039cda276a7e8e306109fd7be5cbbb5fb6f6b55cdb5a0e460356a87912a7ea1eee216e716b07d2718ed81b3f602240b14840b2b2bb1a166686173686564f45820934d19bdcc1eed3bc7388074a5ae951c89bb867fda1795d7221a4b0565748bcf58402bba79fb2feeb6dc3e2ff312539e953d952aa31fc557caa376b3bd0ea8f16f835e071786d326d3a28e58d54318fd7ce3fb89ff00d66b5478652151efb5f8c70d"
-        # }
-        
-        # test_data = dumps([
-        #     txBody,
-        #     [txSign],
-        #     "always_fails"
-        # ]).hex()
-        # request = RequestFactory().post('/entries/validate/', {'payload': test_data})
-        # view = EntryViewSet.validate(self, request)
-        # self.assertEqual(view.status_code, 200)
-        # self.assertEqual(view.data['status'], 400)
-        # self.assertEqual(view.data['data'], 'Fail')
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 200)
+        self.assertEqual(view.data['data'], 'Success')
+
+        test_data = dumps([
+            txBody,
+            [txSign],
+            "always_fails"
+        ]).hex()
+        request = RequestFactory().post('/entries/validate/', {'payload': test_data})
+        view = EntryViewSet.validate(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 400)
+        self.assertEqual(view.data['data'], 'Fail')
 
 class NewAccountApiTest(TestCase):
     """

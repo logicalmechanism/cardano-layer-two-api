@@ -40,8 +40,11 @@ def validateTxWrapper(data:list) -> bool:
     """
     Validate a transaction given tx data.
     """
-    # BODY
     txBody = data[0]
+    txSign = data[1]
+    func_name = data[2]
+
+    # BODY
     # must have at least 1 input
     try:
         inputs = txBody['inputs']
@@ -67,12 +70,10 @@ def validateTxWrapper(data:list) -> bool:
         return False
 
     # Check transaction
-    if isTxConserved(inputs, outputs, fee) is False:
+    if isTxConserved(inputs, outputs, fee, func_name) is False:
         return False
 
     # SIGNATURE
-    txSign = data[1]
-
     # at least one signer
     if len(txSign) < 1:
         return False
@@ -97,12 +98,16 @@ def validateTxWrapper(data:list) -> bool:
             return False
         
         signature = sig['sig']
+        key = sig['key']
 
         totalInputs = doesPkhOwnInputs(pkh, inputs, totalInputs)
 
+        # finally check if the sig is true
         if txId not in signature:
             return False
-        if didPkhSignTx(signature) != pkh:
+        outcome = didPkhSignTx(signature, key)
+        outcome = outcome.replace('\n', '')
+        if outcome != pkh:
             return False
     
     # Missing Signers

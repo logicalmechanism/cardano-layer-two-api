@@ -1,13 +1,14 @@
 from api.models import Entry, Account, UTxO
 import subprocess
 
-def didPkhSignTx(sig:str) -> bool:
+def didPkhSignTx(sig:str, key:str) -> bool:
     # sig must sign the txId which equals hashTxBody(txBody)
     # pkh on sig must equal pkh provided
     func = [
         'node',
         'api/verify-signature.js',
         sig,
+        key
     ]
     return subprocess.Popen(func, stdout=subprocess.PIPE).stdout.read().decode('utf-8')
     
@@ -24,7 +25,7 @@ def doesPkhOwnInputs(pkh:str, inputs:dict, amount: int) -> bool:
         return amount
     return amount
 
-def isTxConserved(inputs:dict, outputs:dict, fee:int) -> bool:
+def isTxConserved(inputs:dict, outputs:dict, fee:int, contract:str) -> bool:
     """
     Check the inputs, outputs, and fee for transaction conservation.
 
@@ -37,6 +38,9 @@ def isTxConserved(inputs:dict, outputs:dict, fee:int) -> bool:
     # Sum inputs
     for txId in inputs:
         utxo = UTxO.objects.get(txId=txId)
+        if len(utxo.datum.all()) != 0:
+            if contract == "always_succeed":
+                return False
         for d in utxo.value.all():
             try:
                 inputTotal[d.token.pid][d.token.name] += d.amount

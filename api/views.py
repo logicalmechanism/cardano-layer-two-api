@@ -425,19 +425,54 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         Payload Format: CBOR
         
-        [txBody, [txSign], contract] -> [{inputs:{}, outputs:{}, fee:0}, [{pkh:"", data:"", sig:""}], 'always_succeed']
+        [txBody, [txSign], contract] -> [
+            {inputs:{}, outputs:{}, fee:0}, 
+            [
+                {pkh:"", data:"tx_body_hash", sig:"pkh_sig_of_data"}
+            ], 
+            'smart_contract'
+            ]
+
+        inputs  -> {'tx_hash#1':{}, 'tx_hash#2':{}}
+        outputs -> {
+            'pkh1':{'pid1':{'tkn1':amt1}, 'pid2':{'tkn2':amt2}, 'data':{}},
+            'pkh2':{'pid1':{'tkn1':amt1}, 'data':{}}
+            }
+        
+        The inputs have redeemers assigned to them to use for spending inside 
+        the smart contract and each output has an optional data attached 
+        as the outputs datum. The signing object allows for a multisig to exist 
+        at the time of spending.
         """
         # List of UTxOs to Delete from an Account
-        data = str(request.POST['payload'])
+        try:
+            data = str(request.POST['payload'])
+        except KeyError:
+            bad['data'] = "Missing Data"
+            return Response(bad)
+        
         data = loads(bytes.fromhex(data))
         # data structure check
         if type(data) != list:
             bad["data"] = "Wrong Data Type"
             return Response(bad)
+        
         # must contain the body and sig
         if len(data) != 3:
             bad['data'] = 'Missing Fields'
             return Response(bad)
+        
+        # check sub field types
+        if type(data[0]) != dict:
+            bad['data'] = 'Wrong Data Type'
+            return Response(bad)
+        if type(data[1]) != list:
+            bad['data'] = 'Wrong Data Type'
+            return Response(bad)
+        if type(data[2]) != str:
+            bad['data'] = 'Wrong Data Type'
+            return Response(bad)
+
         # validate the data
         if validateTxWrapper(data) is True:
             good['data'] = 'Success'

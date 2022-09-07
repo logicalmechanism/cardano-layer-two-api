@@ -37,11 +37,11 @@ def constructTxBody(inputs:dict, outputs:dict, fee:int) -> str:
     return dumps(txBody).hex()
 
 def validateTxWrapper(data:list) -> bool:
+    """
+    Validate a transaction given tx data.
+    """
     # BODY
     txBody = data[0]
-    if type(txBody) != dict:
-        return False
-    
     # must have at least 1 input
     try:
         inputs = txBody['inputs']
@@ -58,7 +58,7 @@ def validateTxWrapper(data:list) -> bool:
     if len(outputs) == 0:
         return False
     
-    # fee cant be 0
+    # fee cant be 0, asssume min fee is always 1
     try:
         fee = int(txBody['fee'])
         if fee < 1:
@@ -69,19 +69,21 @@ def validateTxWrapper(data:list) -> bool:
     # Check transaction
     if isTxConserved(inputs, outputs, fee) is False:
         return False
-    
+
     # SIGNATURE
     txSign = data[1]
-    if type(txSign) != list:
-        return False
+
+    # at least one signer
     if len(txSign) < 1:
         return False
+
     totalInputs = len(inputs)
     for sig in txSign:
         try:
             pkh = str(sig['pkh'])
         except KeyError:
             return False
+
         if pkh == '':
             return False
         
@@ -89,15 +91,17 @@ def validateTxWrapper(data:list) -> bool:
             txId = sig['data']
         except KeyError:
             return False
-        if hashTxBody(txBody) != txId:
+        
+        # check for correct tx constructure
+        if constructTxBody(inputs, outputs, fee) != txId:
             return False
         
         signature = sig['sig']
 
         totalInputs = doesPkhOwnInputs(pkh, inputs, totalInputs)
+
         if txId not in signature:
             return False
-
         if didPkhSignTx(signature) != pkh:
             return False
     

@@ -419,7 +419,7 @@ class DeleteUTxOsApiTest(TestCase):
     
     def test_no_payload(self):
         request = RequestFactory().post('/entries/deleteUTxOs/', {})
-        view = EntryViewSet.newAccount(self, request)
+        view = EntryViewSet.deleteUTxOs(self, request)
         self.assertEqual(view.status_code, 200)
         self.assertEqual(view.data['status'], 400)
         self.assertEqual(view.data['data'], 'Missing Data')
@@ -501,7 +501,7 @@ class GetUTxOsApiTest(TestCase):
     
     def test_no_payload(self):
         request = RequestFactory().post('/entries/getUTxOs/', {})
-        view = EntryViewSet.newUTxO(self, request)
+        view = EntryViewSet.getUTxOs(self, request)
         self.assertEqual(view.status_code, 200)
         self.assertEqual(view.data['status'], 400)
         self.assertEqual(view.data['data'], 'Missing Data')
@@ -551,16 +551,27 @@ class GetUTxOsApiTest(TestCase):
 class TotalAdaApiTest(TestCase):
     """
     Testing the total api endpoint.
+
+    /entries/totalAda/
     """
+    test_pkh1 = "54b22504fb5f504d5e1eaefa915940957ae530aa854bb8c6b403e80c"
+    
+    def test_no_payload(self):
+        request = RequestFactory().post('/entries/totalAda/', {})
+        view = EntryViewSet.totalAda(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 400)
+        self.assertEqual(view.data['data'], 'Missing Data')
+    
     def test_correct_total(self):
         # Create some fake data
-        Account.objects.create(pkh="somepkhhere").save()
-        user = Account.objects.get(pkh="somepkhhere")
+        Account.objects.create(pkh=self.test_pkh1).save()
+        user = Account.objects.get(pkh=self.test_pkh1)
         
         Token.objects.create(pid="", name="").save() # ada
         token = Token.objects.get(pid="")
         
-        Value.objects.create(token=token,amount=10).save()
+        Value.objects.create(token=token,amount=1000).save()
         value = Value.objects.get(token=token)
         
         u = UTxO.objects.create(txId="utxo1")
@@ -574,12 +585,12 @@ class TotalAdaApiTest(TestCase):
         view = EntryViewSet.totalAda(self, request)
         self.assertEqual(view.status_code, 200)
         self.assertEqual(view.data['status'], 200)
-        self.assertEqual(view.data['data'], 10)
+        self.assertEqual(view.data['data'], 1000)
     
     def test_no_entries_total(self):
         # Create some fake data
-        Account.objects.create(pkh="somepkhhere").save()
-        user = Account.objects.get(pkh="somepkhhere")
+        Account.objects.create(pkh=self.test_pkh1).save()
+        user = Account.objects.get(pkh=self.test_pkh1)
         
         request = RequestFactory().post('/entries/totalAda/', {'payload': user.pkh})
         view = EntryViewSet.totalAda(self, request)
@@ -599,9 +610,18 @@ class HashingApiTest(TestCase):
     """"
     Testing for the hash api endpoint.
     """
+    test_pkh1 = "54b22504fb5f504d5e1eaefa915940957ae530aa854bb8c6b403e80c"
+    
+    def test_no_payload(self):
+        request = RequestFactory().post('/entries/hashTx/', {})
+        view = EntryViewSet.hashTx(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 400)
+        self.assertEqual(view.data['data'], 'Missing Data')
+    
     def test_good_data_object_hashing(self):
         test_data = dumps({
-            "inputs":{},
+            "inputs":[],
             "outputs":{},
             "fee":0
         }).hex()
@@ -609,7 +629,31 @@ class HashingApiTest(TestCase):
         view = EntryViewSet.hashTx(self, request)
         self.assertEqual(view.status_code, 200)
         self.assertEqual(view.data['status'], 200)
-        self.assertEqual(view.data['data'], '63bc09bd1a06d4c624ba0726ad0e2b00606e5902e65b42964edfdab04eaf5649')
+        self.assertEqual(view.data['data'], '69fb181328ab941feccdb5093fd87d31d1bc2655bf76846ec42c293963ca5634')
+    
+    def test_bad_data_object_bad_values(self):
+        test_data = dumps({
+            "inputs":{},
+            "outputs":[],
+            "fee":'0'
+        }).hex()
+        request = RequestFactory().post('/entries/hashTx/', {'payload': test_data})
+        view = EntryViewSet.hashTx(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 400)
+        self.assertEqual(view.data['data'], 'Wrong Data Type')
+    
+    def test_bad_data_object_bad_keys(self):
+        test_data = dumps({
+            "1inputs":[],
+            "1outputs":{},
+            "1fee":0
+        }).hex()
+        request = RequestFactory().post('/entries/hashTx/', {'payload': test_data})
+        view = EntryViewSet.hashTx(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 400)
+        self.assertEqual(view.data['data'], 'Missing Fields')
     
     def test_bad_data_object_hashing(self):
         test_data = dumps({
@@ -629,3 +673,14 @@ class HashingApiTest(TestCase):
         self.assertEqual(view.status_code, 200)
         self.assertEqual(view.data['status'], 400)
         self.assertEqual(view.data['data'], 'Wrong Data Type')
+
+class RandomNumberApiTest(TestCase):
+    """
+    Test a random number, crypto secure integer less than 2^64 -1
+    """
+    def test_no_payload(self):
+        request = RequestFactory().get('/entries/randN/')
+        view = EntryViewSet.randN(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 200)
+        self.assertLessEqual(view.data['data'], pow(2, 64) - 1)

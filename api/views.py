@@ -1,6 +1,7 @@
+from weakref import KeyedRef
 from api.models import Entry, Account, UTxO, Task
 from api.validation import didPkhSignTx, isTxConserved, doesPkhOwnInputs
-from api.helper import hashTxBody, deleteUtxosWrapper, newUtxosWrapper, sendTxWrapper, validateTxWrapper, merkleTree
+from api.helper import hashTxBody, deleteUtxosWrapper, newUtxosWrapper, sendTxWrapper, validateTxWrapper, merkleTree, randomNumber
 from rest_framework import viewsets
 from rest_framework import permissions
 from api.serializers import EntrySerializer, TaskSerializer
@@ -137,7 +138,7 @@ class EntryViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     # create a new account with a pkh
-    @action(methods=['post'], detail=False, permission_classes=[permissions.IsAuthenticated])
+    @action(methods=['POST'], detail=False, permission_classes=[permissions.IsAuthenticated])
     def newAccount(self, request):
         """
         /entries/newAccount/
@@ -171,7 +172,7 @@ class EntryViewSet(viewsets.ModelViewSet):
         return Response(good)
 
     # create a new entry
-    @action(methods=['post'], detail=False, permission_classes=[permissions.IsAuthenticated])
+    @action(methods=['POST'], detail=False, permission_classes=[permissions.IsAuthenticated])
     def newUTxO(self, request):
         """
         /entries/newUTxO/
@@ -219,7 +220,7 @@ class EntryViewSet(viewsets.ModelViewSet):
             bad['data'] = 'Fail'
             return Response(bad)
     
-    # deletes utxos
+    # deletes a list utxos
     @action(methods=['POST'], detail=False, permission_classes=[permissions.IsAuthenticated])
     def deleteUTxOs(self, request):
         """
@@ -318,16 +319,28 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         Chain Agnostic PKH
         """
-        total = 0
-        # Check if account exists
+        
+        # check for missing data
         try:
-            acct = Account.objects.get(pkh=request.POST['payload'])
+            pkh = str(request.POST['payload'])
+        except KeyError:
+            bad['data'] = "Missing Data"
+            return Response(bad)
+        
+        # must have an account to get utxos
+        try:
+            acct = Account.objects.get(pkh=pkh)
         except:
             return Response(noAccount)
+        
+        # get total ada
+        total = 0
         for entry in Entry.objects.filter(account=acct):
             for value in entry.utxo.value.all():
-                if str(value.token.pid) == "": # synthetic ada only
+                # synthetic ada only
+                if str(value.token.pid) == "":
                     total += value.amount
+        
         # return 200 and the payload
         good['data'] = total
         return Response(good)
@@ -342,11 +355,20 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         Payload Format: CBOR
 
-        {inputs, outputs, fee} -> {inputs:{}, outputs:{}, fee:0}
+        {inputs, outputs, fee} -> {inputs:[], outputs:{}, fee:0}
+
+        inputs  -> ['tx_hash#1', 'tx_hash#2']
+        outputs -> {'pkh':{'pid1':{'tkn1':amt1}, 'pid2':{'tkn2':amt2}}}
         """
-        # List of UTxOs to Delete from an Account
-        data = str(request.POST['payload'])
+        # check for missing data
+        try:
+            data = str(request.POST['payload'])
+        except KeyError:
+            bad['data'] = "Missing Data"
+            return Response(bad)
+
         data = loads(bytes.fromhex(data))
+
         # data structure check
         if type(data) != dict:
             bad['data'] = 'Wrong Data Type'
@@ -354,11 +376,45 @@ class EntryViewSet(viewsets.ModelViewSet):
         if len(data) != 3:
             bad['data'] = 'Missing Fields'
             return Response(bad)
+        
+        # make sure fields exist
+        try:
+            data['inputs']
+            data['outputs']
+            data['fee']
+        except KeyError:
+            bad['data'] = 'Missing Fields'
+            return Response(bad)
+        
+        # check sub field types
+        if type(data['inputs']) != list:
+            bad['data'] = 'Wrong Data Type'
+            return Response(bad)
+        if type(data['outputs']) != dict:
+            bad['data'] = 'Wrong Data Type'
+            return Response(bad)
+        if type(data['fee']) != int:
+            bad['data'] = 'Wrong Data Type'
+            return Response(bad)
+
         hashedData = hashTxBody(data)
         # attach payload and return
         good['data'] = hashedData
         return Response(good)
     
+    # returns a random integer less than 2^64 - 1
+    @action(methods=['GET'], detail=False, permission_classes=[permissions.IsAuthenticated])
+    def randN(self, request):
+        """
+        /entries/randN/
+
+        @see: api.tests.randN
+        """
+        value = randomNumber()
+        # attach payload and return
+        good['data'] = value
+        return Response(good)
+
     # validates a transaction
     @action(methods=['POST'], detail=False, permission_classes=[permissions.IsAuthenticated])
     def validate(self, request):

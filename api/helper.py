@@ -3,6 +3,7 @@ from api.validation import isTxConserved, doesPkhOwnInputs, didPkhSignTx
 from api.models import Entry, Account, UTxO, Value, Token
 from api.contracts import Contract
 from cbor2 import dumps
+from secrets import randbelow
 
 def merkleTree(txIds:list) -> str:
     """
@@ -199,3 +200,9 @@ def hashTxBody(txBody:dict) -> str:
     Input a dictionary and output the blake2b hash. Force digest to 32.
     """
     return blake2b(bytes(str(txBody).encode('utf-8')), digest_size=32).hexdigest()
+
+def randomNumber() -> int:
+    """
+    Return a random integer that is below the max on-chain integer value.
+    """
+    return randbelow(pow(2, 64) - 1)

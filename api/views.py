@@ -81,36 +81,6 @@ class TaskViewSet(viewsets.ModelViewSet):
         good['data'] ='Success'
         return Response(good)
     
-    # merkle tree of a singleusers transactions
-    @action(methods=['post'], detail=False, permission_classes=[permissions.IsAuthenticated])
-    def getMerkleTree(self, request):
-        """
-        /tasks/getMerkleTree/
-
-        @see: api.tests.TaskApiTest
-
-         Payload Format: Public Key Hash (hexdecimal)
-
-        Chain Agnostic PKH
-        """
-        # No empty pkh
-        data = str(request.POST['payload'])
-        data = loads(bytes.fromhex(data))
-        pkh = data['pkh']
-        if pkh == '':
-            bad['data'] = "Missing Data"
-            return Response(bad)
-        payload = []
-        for task in Task.objects.all():
-            accounts = task.account.all()
-            for account in accounts:
-                if str(account.pkh) == pkh:
-                    payload.append((task.cbor, task.number))
-        payload.sort(key=lambda y: y[1])
-        txIds = [a for a,_ in payload]
-        good['data'] = merkleTree(txIds)
-        return Response(good)
-
     # get all the tasks
     @action(methods=['post'], detail=False, permission_classes=[permissions.IsAuthenticated])
     def getAll(self, request):
@@ -481,3 +451,35 @@ class EntryViewSet(viewsets.ModelViewSet):
             bad['data'] = 'Fail'
             return Response(bad)
 
+    # merkle tree of a single users transactions
+    @action(methods=['post'], detail=False, permission_classes=[permissions.IsAuthenticated])
+    def getMerkleTree(self, request):
+        """
+        /entries/getMerkleTree/
+
+        @see: api.tests.MerkleTreeApiTest
+
+        Payload Format: Public Key Hash (hexdecimal)
+
+        Chain Agnostic PKH
+        """
+        # No empty pkh
+        try:
+            data = str(request.POST['payload'])
+        except KeyError:
+            bad['data'] = "Missing Data"
+            return Response(bad)
+        
+        if data == '':
+            bad['data'] = "Missing Data"
+            return Response(bad)
+
+        payload = []
+        entries = Entry.objects.all()
+        for entry in entries:
+            if str(entry.account.pkh) == data:
+                payload.append(entry.utxo.txId)
+
+        # get merkle and return
+        good['data'] = merkleTree(payload)
+        return Response(good)

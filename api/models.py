@@ -30,5 +30,4 @@ class Entry(models.Model):
 class Task(models.Model):
     number  = models.IntegerField()
     cbor    = models.TextField()
-    account = models.ManyToManyField(Account)
 

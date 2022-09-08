@@ -60,11 +60,64 @@ class TaskApiTest(TestCase):
         self.assertEqual(view.data['status'], 200)
         self.assertEqual(view.data['data'], [('a', 0), ('c', 1), ('b', 2), ('d', 3)])
 
-class HelperApiTest(TestCase):
+class MerkleTreeApiTest(TestCase):
     """
-    Testing the validate api endpoint.
+    Testing the merkle tree api endpoint.
     """
+    test_pkh1 = "00f81595a5e215c4cc63ec82a0790e66c6b109033bc34e23c03cd756eb57e3e14dcee6ba8f48b97044ca868b4ee017d04ecc792de386beab74"
+    def setUp(self):
+        Account.objects.create(pkh=self.test_pkh1)
+        Token.objects.create(pid="", name="")
+
+    def test_no_payload(self):
+        request = RequestFactory().post('/entries/getMerkleTree/', {})
+        view = EntryViewSet.getMerkleTree(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 400)
+        self.assertEqual(view.data['data'], 'Missing Data')
+
+    def test_empty_payload(self):
+        request = RequestFactory().post('/entries/getMerkleTree/', {'payload': ''})
+        view = EntryViewSet.getMerkleTree(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 400)
+        self.assertEqual(view.data['data'], 'Missing Data')
+    
+    def test_good_payload(self):
+        user = Account.objects.get(pkh=self.test_pkh1)
+        token = Token.objects.get(pid="")
+        Value.objects.create(token=token,amount=10).save()
+        value = Value.objects.get(token=token)
+        
+        u = UTxO.objects.create(txId="utxo1")
+        u.value.set([value])
+        utxo = UTxO.objects.get(txId="utxo1")
+        Entry.objects.create(account=user, utxo=utxo).save()
+
+        # u = UTxO.objects.create(txId="utxo2")
+        # u.value.set([value])
+        # utxo = UTxO.objects.get(txId="utxo2")
+        # Entry.objects.create(account=user, utxo=utxo).save()
+
+        request = RequestFactory().post('/entries/getMerkleTree/', {'payload': self.test_pkh1})
+        view = EntryViewSet.getMerkleTree(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 200)
+        self.assertEqual(view.data['data'], '9f08bb4d4e4323cfa7fcd5f719329af1b28aa1be233f4c0fd4baab4b2e9f5d8d')
+    
     def test_merkle_tree(self):
+        test_data = [i for i in range(0)]
+        output = merkleTree(test_data)
+        self.assertEqual(output, '')
+
+        test_data = [i for i in range(1)]
+        output = merkleTree(test_data)
+        self.assertEqual(output, '0fd923ca5e7218c4ba3c3801c26a617ecdbfdaebb9c76ce2eca166e7855efbb8')
+
+        test_data = [i for i in range(2)]
+        output = merkleTree(test_data)
+        self.assertEqual(output, '45f3d3ed97ca49b86f1ae514e55e69e0fba32124aa23eb4b70260f89f259271b')
+
         test_data = [i for i in range(7)]
         output = merkleTree(test_data)
         self.assertEqual(output, 'a1a088cb5bf9e1926441bb39e9470dbd26dd5621ab5003e790e390866e7b7c51')

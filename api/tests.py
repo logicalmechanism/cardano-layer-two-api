@@ -276,6 +276,7 @@ class NewAccountApiTest(TestCase):
 
     def test_payload_length(self):
         request = RequestFactory().post('/entries/newAccount/', {'payload': self.test_pkh1})
+        print(request.build_absolute_uri())
         view = EntryViewSet.newAccount(self, request)
         self.assertEqual(view.status_code, 200)
         self.assertEqual(Account.objects.get(pkh=self.test_pkh1).pkh, self.test_pkh1)
@@ -323,38 +324,22 @@ class NewUTxOApiTest(TestCase):
     """
     test_pkh1 = "54b22504fb5f504d5e1eaefa915940957ae530aa854bb8c6b403e80c"
     data1 = {
-        "pkh":test_pkh1,
+        "pkh": test_pkh1,
         "utxos": {
-            "utxo1": {
-                "": {
-                    "": 10
-                }
-            }
+            "utxo1": {"": {"": 10}}
         }
     }
     data2 = {
-        "pkh":'test_pkh1',
+        "pkh": 'test_pkh1',
         "utxos": {
-            "utxo1": {
-                "": {
-                    "": 10
-                }
-            }
+            "utxo1": {"": {"": 10}}
         }
     }
     data3 = {
-        "pkh":test_pkh1,
+        "pkh": test_pkh1,
         "utxos": {
-            "utxo1": {
-                "": {
-                    "": 10
-                }
-            },
-            "utxo1": {
-                "": {
-                    "": 10
-                }
-            }
+            "utxo1": {"": {"": 10}},
+            "utxo1": {"": {"": 5}}
         }
     }
 
@@ -379,7 +364,7 @@ class NewUTxOApiTest(TestCase):
         self.assertEqual(len(Entry.objects.all()), 1)
         # find all entries from an account and check that the first utxo hash a value of 10.
         self.assertEqual(Entry.objects.get(account=Account.objects.get(pkh=self.test_pkh1)).utxo.value.all()[0].amount, 10)
-    
+
     def test_no_account(self):
         test_data = dumps(self.data2).hex()
         request = RequestFactory().post('/entries/newUTxO/', {'payload': test_data})
@@ -416,7 +401,7 @@ class NewUTxOApiTest(TestCase):
         view = EntryViewSet.newUTxO(self, request)
         self.assertEqual(view.status_code, 200)
         self.assertEqual(view.data['status'], 400)
-        self.assertEqual(view.data['data'], 'Missing Fields')
+        self.assertEqual(view.data['data'], 'Wrong Data Type')
         self.assertEqual(len(Entry.objects.all()), 0)
     
         test_data = dumps({
@@ -438,8 +423,8 @@ class NewUTxOApiTest(TestCase):
         request = RequestFactory().post('/entries/newUTxO/', {'payload': test_data})
         view = EntryViewSet.newUTxO(self, request)
         self.assertEqual(view.status_code, 200)
-        self.assertEqual(view.data['status'], 400)
-        self.assertEqual(view.data['data'], 'Fail')
+        self.assertEqual(view.data['status'], 200)
+        self.assertEqual(view.data['data'], 'Success')
         self.assertEqual(len(Entry.objects.all()), 0)
 
         # bad value

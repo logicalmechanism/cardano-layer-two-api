@@ -1,5 +1,3 @@
-from multiprocessing.sharedctypes import Value
-from weakref import KeyedRef
 from api.models import Entry, Account, UTxO, Task
 from api.validation import didPkhSignTx, isTxConserved, doesPkhOwnInputs
 from api.helper import hashTxBody, deleteUtxosWrapper, newUtxosWrapper, sendTxWrapper, validateTxWrapper, merkleTree, randomNumber
@@ -209,13 +207,18 @@ class EntryViewSet(viewsets.ModelViewSet):
             bad['data'] = 'Wrong Data Type'
             return Response(bad)
         
+        # check if both keys are there
         try:
-            pkh = str(data['pkh'])
+            pkh = str(data['pkh']) # force string
             utxos = data['utxos']
         except KeyError:
             bad['data'] = 'Missing Fields'
             return Response(bad)
         
+        if type(utxos) != dict:
+            bad['data'] = 'Wrong Data Type'
+            return Response(bad)
+
         # must have utxos
         if len(utxos) == 0:
             bad['data'] = 'Missing Fields'
@@ -296,18 +299,18 @@ class EntryViewSet(viewsets.ModelViewSet):
             return Response(bad)
         
         # must have an account to get utxos
+        # for a in Account.objects.all():
+        #     print(a.pkh)
         try:
             acct = Account.objects.get(pkh=pkh)
         except:
             return Response(noAccount)
-        
         # loop the entries for the account and return a value of all the data
         utxos = {}
         for entry in Entry.objects.filter(account=acct):
             # loop all tokens in value
             value = entry.utxo.value
             for val in value.all():
-                
                 tkn = val.token
                 amt = val.amount
                 # dict of txid to value

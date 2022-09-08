@@ -1,6 +1,6 @@
 from hashlib import blake2b
 from api.validation import isTxConserved, doesPkhOwnInputs, didPkhSignTx
-from api.models import Entry, Account, UTxO, Value, Token
+from api.models import Entry, Account, UTxO, Value, Token, Datum
 from api.contracts import Contract
 from cbor2 import dumps, loads
 from secrets import randbelow
@@ -189,33 +189,40 @@ def newUtxosWrapper(pkh:str, utxos:dict) -> bool:
         if type(data) != dict:
             return False
         
-        # make sure the pid object is correct
-        try:
-            pid = list(data.keys())[0]
-        except IndexError:
-            return False
+        for pid in data:
+            # this is the datum
+            if pid == 'data':
+                pass
+            
+            
+            if type(data[pid]) != dict:
+                return False
+            
+            counter=0
+            for tkn in data[pid]:
+                amt = data[pid][tkn]
+                # positive non zero integers only
+                if amt < 1:
+                    return False
+                
+                t = Token(pid=pid, name=tkn)
+                t.save()
+                v = Value(token=t , amount=amt)
+                v.save()
+                u = UTxO.objects.create(txId=hashTxBody(utxo)+'#'+str(counter))
+                u.value.set([v])
+                
+                # attach datum if any
+                try:
+                    d = Datum(datumHash=hashTxBody(data['data']), data=data['data'])
+                    d.save()
+                    u.datum.set([d])
+                except KeyError:
+                    pass
         
-        # must be dict
-        if type(data[pid]) != dict:
-            return False
-        
-        # can this fail?
-        name = list(data[pid].keys())[0]
-        t = Token(pid=pid, name=name)
-        t.save()
-        
-        # positive non zero integers
-        if int(data[pid][name]) < 1:
-            return False
-        
-        v = Value(token=t , amount=int(data[pid][name]))
-        v.save()
-        
-        u = UTxO.objects.create(txId=str(utxo))
-        u.value.set([v])
-        
-        e = Entry(account=a, utxo=u)
-        e.save()
+                e = Entry(account=a, utxo=u)
+                e.save()
+                counter += 1
     return True
 
 def deleteUtxosWrapper(pkh:str, utxos:list) -> bool:

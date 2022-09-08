@@ -1,3 +1,4 @@
+from multiprocessing.sharedctypes import Value
 from weakref import KeyedRef
 from api.models import Entry, Account, UTxO, Task
 from api.validation import didPkhSignTx, isTxConserved, doesPkhOwnInputs
@@ -12,12 +13,12 @@ from cbor2 import dumps, loads
 #
 ###############################################################################
 
-good = { 'status': 200, 'data': '' }
-bad  = { 'status': 400, 'data': 'Bad Data' }
-failed = { 'status': 400, 'data': 'Tx Failed' }
-accountExist  = { 'status': 409, 'data': 'Account Already Exists' }
-utxoExist  = { 'status': 409, 'data': 'UTxO Already Exists' }
-noAccount  = { 'status': 401, 'data': 'No Account Exists' }
+good         = { 'status': 200, 'data': '' }
+bad          = { 'status': 400, 'data': 'Bad Data' }
+failed       = { 'status': 400, 'data': 'Tx Failed' }
+accountExist = { 'status': 409, 'data': 'Account Already Exists' }
+utxoExist    = { 'status': 409, 'data': 'UTxO Already Exists' }
+noAccount    = { 'status': 401, 'data': 'No Account Exists' }
 
 ###############################################################################
 #
@@ -38,51 +39,89 @@ class TaskViewSet(viewsets.ModelViewSet):
 
         @see: api.tests.TaskApiTest
 
-        Payload Format:
+        Payload Format: CBOR
+
+        [txBody, [txSign], contract] -> [
+            {inputs:{}, outputs:{}, fee:0}, 
+            [
+                {pkh:"", data:"tx_body_hash", sig:"pkh_sig_of_data", "key":"key_of_sig"}
+            ], 
+            'smart_contract'
+            ]
+
+        inputs  -> {'tx_hash#1':{}, 'tx_hash#2':{}}
+        outputs -> {
+            'pkh1':{'pid1':{'tkn1':amt1}, 'pid2':{'tkn2':amt2}, 'data':{}},
+            'pkh2':{'pid1':{'tkn1':amt1}, 'data':{}}
+            }
         """
-        data = str(request.POST['payload'])
-        data = loads(bytes.fromhex(data))
+        try:
+            data = str(request.POST['payload'])
+        except KeyError:
+            bad['data'] = "Missing Data"
+            return Response(bad)
+
+        data = loads(bytes.fromhex(data)) # uncbor the data
+
         # check payload
         try:
             num = int(data['number'])
             if num < 0:
                 bad['data'] = "Missing Data"
                 return Response(bad)
-            pkhs = data['pkhs']
-            if type(pkhs) != list:
-                bad['data'] = 'Wrong Data Type'
-                return Response(bad)
-            if len(pkhs) == 0:
-                bad['data'] = "Missing Data"
-                return Response(bad)
-            if any(len(ele) == 0 for ele in pkhs) is True:
-                bad['data'] = "Missing Data"
-                return Response(bad)
+            
             cbor = data['cbor']
             if type(cbor) != str:
                 bad['data'] = 'Wrong Data Type'
                 return Response(bad)
+            
             if cbor == '':
                 bad['data'] = "Missing Data"
+                return Response(bad)
+            
+            try:
+                cbor_data = loads(bytes.fromhex(cbor)) # uncbor the data
+            except ValueError:
+                bad["data"] = "Wrong Data Type"
+                return Response(bad)
+                
+            # data structure check
+            if type(cbor_data) != list:
+                bad["data"] = "Wrong Data Type"
+                return Response(bad)
+            
+            # must contain the body and sig
+            if len(cbor_data) != 3:
+                bad['data'] = 'Missing Fields'
+                return Response(bad)
+            
+            # check sub field types
+            if type(cbor_data[0]) != dict:
+                bad['data'] = 'Wrong Data Type'
+                return Response(bad)
+            if type(cbor_data[1]) != list:
+                bad['data'] = 'Wrong Data Type'
+                return Response(bad)
+            if type(cbor_data[2]) != str:
+                bad['data'] = 'Wrong Data Type'
+                return Response(bad)
+            
+            # validate the data
+            if validateTxWrapper(cbor_data) is False:
+                bad['data'] = 'Fail'
                 return Response(bad)
         except KeyError:
             bad['data'] = "Missing Data"
             return Response(bad)
+        
         # add data the task db
-        t = Task.objects.create(number=num,cbor=cbor)
-        acts = []
-        for pkh in pkhs:
-            try:
-                acts.append(Account.objects.get(pkh=pkh))
-            except:
-                pass
-        t.account.set(acts)
+        Task.objects.create(number=num,cbor=cbor)
         
         good['data'] ='Success'
         return Response(good)
     
     # get all the tasks
-    @action(methods=['post'], detail=False, permission_classes=[permissions.IsAuthenticated])
+    @action(methods=['get'], detail=False, permission_classes=[permissions.IsAuthenticated])
     def getAll(self, request):
         """
         /tasks/getAll/
@@ -92,7 +131,6 @@ class TaskViewSet(viewsets.ModelViewSet):
         No Payload
         """
         payload = []
-        # print(Task.objects.all()[0].account.all())
         for task in Task.objects.all():
             payload.append((task.cbor, task.number))
         payload.sort(key=lambda y: y[1])

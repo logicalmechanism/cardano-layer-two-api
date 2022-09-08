@@ -9,14 +9,13 @@ def merkleTree(txIds:list) -> str:
     """
     Calculate the merkle tree from a list of tx ids.
     """
-<<<<<<< HEAD
 
     numberOfTx = len(txIds)
     if numberOfTx == 0:
         return ''
     if numberOfTx == 1:
         return hashTxBody(txIds[0])
-=======
+    
     # catch bad data types
     if type(txIds) != list:
         return ''
@@ -24,7 +23,6 @@ def merkleTree(txIds:list) -> str:
     if numberOfTx == 0:
         return ''
     # account for even or odd lengths
->>>>>>> main
     if numberOfTx % 2 == 0:
         pairs = [(txIds[i], txIds[i+1]) for i in range(0, numberOfTx, 2)]
     else:

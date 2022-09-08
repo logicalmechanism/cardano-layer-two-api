@@ -110,6 +110,8 @@ class TaskViewSet(viewsets.ModelViewSet):
             if validateTxWrapper(cbor_data) is False:
                 bad['data'] = 'Fail'
                 return Response(bad)
+            
+            # the db update based off of the cbor here
         except KeyError:
             bad['data'] = "Missing Data"
             return Response(bad)
@@ -363,10 +365,13 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         Payload Format: CBOR
 
-        {inputs, outputs, fee} -> {inputs:[], outputs:{}, fee:0}
+        {inputs, outputs, fee} -> {inputs:{}, outputs:{}, fee:0}
 
-        inputs  -> ['tx_hash#1', 'tx_hash#2']
-        outputs -> {'pkh':{'pid1':{'tkn1':amt1}, 'pid2':{'tkn2':amt2}}}
+        inputs  -> {'tx_hash#1':redeemer1, 'tx_hash#2':{}}
+        outputs -> {
+            'pkh1':{'pid1':{'tkn1':amt1}, 'pid2':{'tkn2':amt2}, data:{}},
+            'pkh2':{'pid2':{'tkn2':amt2}, data:datum2}
+        }
         """
         # check for missing data
         try:
@@ -395,7 +400,7 @@ class EntryViewSet(viewsets.ModelViewSet):
             return Response(bad)
         
         # check sub field types
-        if type(data['inputs']) != list:
+        if type(data['inputs']) != dict:
             bad['data'] = 'Wrong Data Type'
             return Response(bad)
         if type(data['outputs']) != dict:
@@ -418,9 +423,8 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         @see: api.tests.randN
         """
-        value = randomNumber()
         # attach payload and return
-        good['data'] = value
+        good['data'] = randomNumber()
         return Response(good)
 
     # validates a transaction
@@ -441,9 +445,9 @@ class EntryViewSet(viewsets.ModelViewSet):
             'smart_contract'
             ]
 
-        inputs  -> {'tx_hash#1':{}, 'tx_hash#2':{}}
+        inputs  -> {'tx_hash#1':redeemer1, 'tx_hash#2':redeemer2}
         outputs -> {
-            'pkh1':{'pid1':{'tkn1':amt1}, 'pid2':{'tkn2':amt2}, 'data':{}},
+            'pkh1':{'pid1':{'tkn1':amt1}, 'pid2':{'tkn2':amt2}, 'data':datum1},
             'pkh2':{'pid1':{'tkn1':amt1}, 'data':{}}
             }
         

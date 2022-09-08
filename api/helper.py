@@ -2,8 +2,21 @@ from hashlib import blake2b
 from api.validation import isTxConserved, doesPkhOwnInputs, didPkhSignTx
 from api.models import Entry, Account, UTxO, Value, Token
 from api.contracts import Contract
-from cbor2 import dumps
+from cbor2 import dumps, loads
 from secrets import randbelow
+
+def toCbor(msg:object) -> str:
+    """
+    Dump a dictionary into cbor.
+    """
+    return dumps(msg).hex()
+
+def fromCbor(msg:str) -> object:
+    """
+    Load a dictionary from cbor.
+    """
+    return loads(bytes.fromhex(msg))
+
 
 def merkleTree(txIds:list) -> str:
     """
@@ -232,6 +245,9 @@ def hashTxBody(txBody:dict) -> str:
 
 def randomNumber() -> int:
     """
-    Return a random integer that is below the max on-chain integer value.
+    The function, secrets.randbelow(n), returns a random int in the range [0, n).
+    The value of n will be the max integer value for on-chain data, 2^64 - 1.
+
+    @see: https://docs.python.org/3/library/secrets.html#secrets.randbelow
     """
     return randbelow(pow(2, 64) - 1)

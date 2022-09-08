@@ -1,7 +1,7 @@
 from django.test import RequestFactory, TestCase
 from api.views import EntryViewSet, TaskViewSet
 from api.models import Entry, Account, UTxO, Value, Token, Task, Datum, Redeemer
-from api.helper import hashTxBody, merkleTree, constructTxBody
+from api.helper import hashTxBody, merkleTree, constructTxBody, toCbor, fromCbor
 from cbor2 import dumps, loads
 
 class TaskApiTest(TestCase):
@@ -18,8 +18,8 @@ class TaskApiTest(TestCase):
         Account.objects.create(pkh=self.test_pkh1)
         Account.objects.create(pkh=self.test_pkh2)
         Account.objects.create(pkh=self.test_pkh3)
-
         Token.objects.create(pid="", name="")
+
     def test_new_task_no_data(self):
         request = RequestFactory().post('/tasks/newTask/', {})
         view = TaskViewSet.newTask(self, request)
@@ -693,7 +693,7 @@ class HashingApiTest(TestCase):
     
     def test_good_data_object_hashing(self):
         test_data = dumps({
-            "inputs":[],
+            "inputs":{},
             "outputs":{},
             "fee":0
         }).hex()
@@ -701,7 +701,7 @@ class HashingApiTest(TestCase):
         view = EntryViewSet.hashTx(self, request)
         self.assertEqual(view.status_code, 200)
         self.assertEqual(view.data['status'], 200)
-        self.assertEqual(view.data['data'], '69fb181328ab941feccdb5093fd87d31d1bc2655bf76846ec42c293963ca5634')
+        self.assertEqual(view.data['data'], '63bc09bd1a06d4c624ba0726ad0e2b00606e5902e65b42964edfdab04eaf5649')
     
     def test_bad_data_object_bad_values(self):
         test_data = dumps({
@@ -756,3 +756,38 @@ class RandomNumberApiTest(TestCase):
         self.assertEqual(view.status_code, 200)
         self.assertEqual(view.data['status'], 200)
         self.assertLessEqual(view.data['data'], pow(2, 64) - 1)
+
+class CborApiTest(TestCase):
+    """
+    Test the to and from Cbor functions.
+    """
+    def test_to_cbor_empty(self):
+        test_data = {}
+        output = toCbor(test_data)
+        self.assertEqual(output, 'a0')
+    
+    def test_to_cbor_nested(self):
+        test_data = [{},{},'']
+        output = toCbor(test_data)
+        self.assertEqual(output, '83a0a060')
+    
+    def test_to_cbor_good_data(self):
+        test_data = [{},{},0]
+        output = toCbor(test_data)
+        self.assertEqual(output, '83a0a000')
+    
+    def test_to_cbor_string(self):
+        test_data = 'test'
+        output = toCbor(test_data)
+        self.assertEqual(output, '6474657374')
+    
+    def to_from_cbor_string(self):
+        test_data = "6474657374"
+        output = fromCbor(test_data)
+        self.assertEqual(output, 'test')
+    
+    def to_from_cbor_nested(self):
+        test_data = "83a0a000"
+        output = fromCbor(test_data)
+        print(output)
+        self.assertEqual(output, [{},{},0])

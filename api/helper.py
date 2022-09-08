@@ -15,14 +15,23 @@ def merkleTree(txIds:list) -> str:
         return ''
     if numberOfTx == 1:
         return hashTxBody(txIds[0])
+    
+    # catch bad data types
+    if type(txIds) != list:
+        return ''
+    numberOfTx = len(txIds)
+    if numberOfTx == 0:
+        return ''
+    # account for even or odd lengths
     if numberOfTx % 2 == 0:
         pairs = [(txIds[i], txIds[i+1]) for i in range(0, numberOfTx, 2)]
     else:
         pairs = [(txIds[i], txIds[i+1]) for i in range(0, numberOfTx-1, 2)]
+    # build up leaves of the tree
     hashes = []
     for a, b in pairs:
         hashes.append(hashTxBody(str(a)+str(b)))
-    # Return the last hash
+    # Return the root of the tree
     if len(hashes) == 1:
         return hashes[0]
     # correct for odd lengths
@@ -34,6 +43,12 @@ def constructTxBody(inputs:dict, outputs:dict, fee:int) -> str:
     """
     Create a cbor payload of the txBody.
     """
+    if fee < 0:
+        return ''
+    if type(inputs) != dict or type(outputs) != dict:
+        return ''
+    if len(inputs) == 0 or len(outputs) == 0:
+        return ''
     txBody = {
         'inputs': inputs,
         'outputs': outputs,

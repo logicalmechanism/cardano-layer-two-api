@@ -1,6 +1,0 @@
-cradle:
-  cabal:
-    - path: "./locking-contract/src"
-      component: "locking-contract:lib:locking-contract"
-    - path: "./locking-contract/pab"
-      component: "plutus-starter:exe:plutus-starter-pab"

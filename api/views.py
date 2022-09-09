@@ -110,6 +110,25 @@ class TaskViewSet(viewsets.ModelViewSet):
                 return Response(bad)
             
             # the db update based off of the cbor here
+            inputs  = [utxo for utxo in cbor_data[0]['inputs']]
+            deleteData = {}
+            for signature in cbor_data[1]:
+                pkh = signature['pkh']
+                deleteData[pkh] = []
+                for entry in Entry.objects.filter(account=Account.objects.get(pkh=pkh)):
+                    txId = entry.utxo.txId
+                    if txId in inputs:
+                        deleteData[pkh].append(txId)
+
+            for p in deleteData:
+                deleteUtxosWrapper(p, deleteData[p])
+
+            thisTxId = hashTxBody(cbor_data[0])
+            counter = 0
+            for out in cbor_data[0]['outputs']:
+                newUtxosWrapper(out, {thisTxId+'#'+str(counter): cbor_data[0]['outputs'][out]})
+                counter += 1
+            # delete inputs and create outputs
         except KeyError:
             bad['data'] = "Missing Data"
             return Response(bad)

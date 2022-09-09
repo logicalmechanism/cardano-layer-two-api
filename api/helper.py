@@ -1,5 +1,5 @@
 from hashlib import blake2b
-from api.validation import isTxConserved, doesPkhOwnInputs, didPkhSignTx
+from api.validation import isTxConserved, doesPkhOwnInputs, didPkhSignTx, doOutputPkhsExist
 from api.models import Entry, Account, UTxO, Value, Token, Datum
 from api.contracts import Contract
 from cbor2 import dumps, loads
@@ -108,11 +108,13 @@ def validateTxWrapper(data:list) -> bool:
 
     # SIGNATURE
     # at least one signer
+
     if len(txSign) < 1:
         return False
 
     totalInputs = len(inputs)
     for sig in txSign:
+
         try:
             pkh = str(sig['pkh'])
         except KeyError:
@@ -125,28 +127,33 @@ def validateTxWrapper(data:list) -> bool:
             txId = sig['data']
         except KeyError:
             return False
-        
+
         # check for correct tx constructure
-        if constructTxBody(inputs, outputs, fee) != txId:
+        if constructTxBody(inputs, outputs, fee).lower() != txId.lower():
             return False
         
         signature = sig['sig']
         key = sig['key']
 
+        # make sure all the inputs are owned by signers
         totalInputs = doesPkhOwnInputs(pkh, inputs, totalInputs)
 
+        # make sure the destination exists
+        if doOutputPkhsExist(outputs) is False:
+            return False
+
         # finally check if the sig is true
-        if txId not in signature:
+        if txId.lower() not in signature.lower():
             return False
         outcome = didPkhSignTx(signature, key)
+        
         outcome = outcome.replace('\n', '')
         if outcome != pkh:
             return False
-    
+
     # Missing Signers
     if totalInputs != 0:
         return False
-    
     # CONTRACT
     func_name = data[2]
     contract = Contract()
@@ -184,7 +191,6 @@ def newUtxosWrapper(pkh:str, utxos:dict) -> bool:
     # add in all utxos and fail if any fail
     for utxo in utxos:
         data = utxos[utxo]
-        
         # must be dict
         if type(data) != dict:
             return False

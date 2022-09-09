@@ -30,7 +30,7 @@ class TaskApiTest(TestCase):
     def test_new_task_bad_tx(self):
         test_data = dumps({
             "pkh":self.test_pkh1,
-            "utxos":{"utxo1":{"":{"":10}}}
+            "utxos":{"9f08bb4d4e4323cfa7fcd5f719329af1b28aa1be233f4c0fd4baab4b2e9f5d8d#0":{"":{"":10}}}
         }).hex()
         request = RequestFactory().post('/entries/newUTxO/', {'payload': test_data})
         view = EntryViewSet.newUTxO(self, request)
@@ -62,8 +62,8 @@ class TaskApiTest(TestCase):
         self.assertEqual(view.data['status'], 200)
         self.assertEqual(view.data['data'], 'Success')
 
-        for e in Entry.objects.all():
-            print(e.utxo.txId)
+        # for e in Entry.objects.all():
+        #     print(e.utxo.txId)
     
     def test_new_task_good_data_bad_number(self):
         test_data = dumps({
@@ -230,7 +230,7 @@ class ValidateApiTest(TestCase):
     def test_validate_with_bad_accounts(self):
         test_data = dumps({
             "pkh":self.test_pkh1,
-            "utxos":{"utxo1":{"":{"":10}}}
+            "utxos":{"9f08bb4d4e4323cfa7fcd5f719329af1b28aa1be233f4c0fd4baab4b2e9f5d8d#0":{"":{"":10}}}
         }).hex()
         request = RequestFactory().post('/entries/newUTxO/', {'payload': test_data})
         view = EntryViewSet.newUTxO(self, request)
@@ -266,7 +266,7 @@ class ValidateApiTest(TestCase):
     def test_validate(self):
         test_data = dumps({
             "pkh":self.test_pkh1,
-            "utxos":{"utxo1":{"":{"":10}}}
+            "utxos":{"9f08bb4d4e4323cfa7fcd5f719329af1b28aa1be233f4c0fd4baab4b2e9f5d8d#0":{"":{"":10}}}
         }).hex()
         request = RequestFactory().post('/entries/newUTxO/', {'payload': test_data})
         view = EntryViewSet.newUTxO(self, request)

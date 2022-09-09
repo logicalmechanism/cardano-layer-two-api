@@ -21,10 +21,10 @@ python manage.py makemigrations
 python manage.py migrate --run-syncdb
 ```
 
-Create a api token from a user, typically a superuser.
+Create a api token for a user. Superusers are admin for crud and regular users have just authentication.
 ```
 python manage.py createsuperuser
-python manage.py drf_create_token <superusername>
+python manage.py drf_create_token <username>
 ```
 
 Run api server

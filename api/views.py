@@ -27,10 +27,10 @@ class TaskViewSet(viewsets.ModelViewSet):
     """
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    # permission_classes = [permissions.IsAuthenticated]
     
     # create a new task
-    @action(methods=['post'], detail=False, permission_classes=[permissions.IsAuthenticated])
+    @action(methods=['post'], detail=False, permission_classes=[permissions.IsAdminUser])
     def newTask(self, request):
         """
         /tasks/newTask/
@@ -169,10 +169,9 @@ class EntryViewSet(viewsets.ModelViewSet):
     """
     queryset = Entry.objects.all()
     serializer_class = EntrySerializer
-    permission_classes = [permissions.IsAuthenticated]
 
     # create a new account with a pkh
-    @action(methods=['POST'], detail=False, permission_classes=[permissions.IsAuthenticated])
+    @action(methods=['POST'], detail=False, permission_classes=[permissions.IsAdminUser])
     def newAccount(self, request):
         """
         /entries/newAccount/
@@ -206,7 +205,7 @@ class EntryViewSet(viewsets.ModelViewSet):
         return Response(good)
 
     # create a new entry
-    @action(methods=['POST'], detail=False, permission_classes=[permissions.IsAuthenticated])
+    @action(methods=['POST'], detail=False, permission_classes=[permissions.IsAdminUser])
     def newUTxO(self, request):
         """
         /entries/newUTxO/
@@ -259,7 +258,7 @@ class EntryViewSet(viewsets.ModelViewSet):
             return Response(bad)
     
     # deletes a list utxos
-    @action(methods=['POST'], detail=False, permission_classes=[permissions.IsAuthenticated])
+    @action(methods=['POST'], detail=False, permission_classes=[permissions.IsAdminUser])
     def deleteUTxOs(self, request):
         """
         /entries/deleteUTxOs/

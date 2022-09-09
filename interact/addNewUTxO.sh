@@ -10,3 +10,4 @@ curl -X POST http://localhost:8000/entries/newUTxO/ \
 -H "Authorization: Token f998b84793d3d56b42b7fad786dfd53e15112ace" \
 --data "${payload}"
 
+echo

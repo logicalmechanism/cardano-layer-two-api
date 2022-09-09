@@ -16,9 +16,9 @@ class Value(models.Model):
     amount = models.IntegerField()
 
 class UTxO(models.Model):
-    txId     = models.CharField(max_length=128, unique=True)
-    value    = models.ManyToManyField(Value)
-    datum    = models.ManyToManyField(Datum)
+    txId  = models.CharField(max_length=128, unique=True)
+    value = models.ManyToManyField(Value)
+    datum = models.ManyToManyField(Datum)
 
 class Account(models.Model):
     pkh = models.CharField(max_length=128, unique=True)
@@ -28,6 +28,6 @@ class Entry(models.Model):
     utxo    = models.ForeignKey(UTxO, on_delete=models.CASCADE)
 
 class Task(models.Model):
-    number  = models.IntegerField()
-    cbor    = models.TextField()
+    number = models.IntegerField(unique=True)
+    cbor   = models.TextField()
 

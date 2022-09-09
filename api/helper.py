@@ -1,9 +1,22 @@
 from hashlib import blake2b
-from api.validation import isTxConserved, doesPkhOwnInputs, didPkhSignTx
-from api.models import Entry, Account, UTxO, Value, Token
+from api.validation import isTxConserved, doesPkhOwnInputs, didPkhSignTx, doOutputPkhsExist
+from api.models import Entry, Account, UTxO, Value, Token, Datum
 from api.contracts import Contract
-from cbor2 import dumps
+from cbor2 import dumps, loads
 from secrets import randbelow
+
+def toCbor(msg:object) -> str:
+    """
+    Dump a dictionary into cbor.
+    """
+    return dumps(msg).hex()
+
+def fromCbor(msg:str) -> object:
+    """
+    Load a dictionary from cbor.
+    """
+    return loads(bytes.fromhex(msg))
+
 
 def merkleTree(txIds:list) -> str:
     """
@@ -88,18 +101,20 @@ def validateTxWrapper(data:list) -> bool:
             return False
     except KeyError:
         return False
-
+    
     # Check transaction
     if isTxConserved(inputs, outputs, fee, func_name) is False:
         return False
 
     # SIGNATURE
     # at least one signer
+
     if len(txSign) < 1:
         return False
 
     totalInputs = len(inputs)
     for sig in txSign:
+
         try:
             pkh = str(sig['pkh'])
         except KeyError:
@@ -112,28 +127,35 @@ def validateTxWrapper(data:list) -> bool:
             txId = sig['data']
         except KeyError:
             return False
-        
+
         # check for correct tx constructure
-        if constructTxBody(inputs, outputs, fee) != txId:
+        if constructTxBody(inputs, outputs, fee).lower() != txId.lower():
             return False
         
         signature = sig['sig']
         key = sig['key']
 
+        # make sure all the inputs are owned by signers
         totalInputs = doesPkhOwnInputs(pkh, inputs, totalInputs)
 
+        # make sure the destination exists
+        if doOutputPkhsExist(outputs) is False:
+            return False
+
         # finally check if the sig is true
-        if txId not in signature:
+        if txId.lower() not in signature.lower():
             return False
         outcome = didPkhSignTx(signature, key)
+        
         outcome = outcome.replace('\n', '')
         if outcome != pkh:
             return False
-    
+        
+
+
     # Missing Signers
     if totalInputs != 0:
         return False
-    
     # CONTRACT
     func_name = data[2]
     contract = Contract()
@@ -171,38 +193,43 @@ def newUtxosWrapper(pkh:str, utxos:dict) -> bool:
     # add in all utxos and fail if any fail
     for utxo in utxos:
         data = utxos[utxo]
-        
         # must be dict
         if type(data) != dict:
             return False
         
-        # make sure the pid object is correct
-        try:
-            pid = list(data.keys())[0]
-        except IndexError:
-            return False
+        for pid in data:
+            # this is the datum
+            if pid == 'data':
+                pass
+            
+            
+            if type(data[pid]) != dict:
+                return False
+            
+            counter=0
+            for tkn in data[pid]:
+                amt = data[pid][tkn]
+                # positive non zero integers only
+                if amt < 1:
+                    return False
+                t = Token(pid=pid, name=tkn)
+                t.save()
+                v = Value(token=t , amount=amt)
+                v.save()
+                u = UTxO.objects.create(txId=utxo)
+                u.value.set([v])
+                
+                # attach datum if any
+                try:
+                    d = Datum(datumHash=hashTxBody(data['data']), data=data['data'])
+                    d.save()
+                    u.datum.set([d])
+                except KeyError:
+                    pass
         
-        # must be dict
-        if type(data[pid]) != dict:
-            return False
-        
-        # can this fail?
-        name = list(data[pid].keys())[0]
-        t = Token(pid=pid, name=name)
-        t.save()
-        
-        # positive non zero integers
-        if int(data[pid][name]) < 1:
-            return False
-        
-        v = Value(token=t , amount=int(data[pid][name]))
-        v.save()
-        
-        u = UTxO.objects.create(txId=str(utxo))
-        u.value.set([v])
-        
-        e = Entry(account=a, utxo=u)
-        e.save()
+                e = Entry(account=a, utxo=u)
+                e.save()
+                counter += 1
     return True
 
 def deleteUtxosWrapper(pkh:str, utxos:list) -> bool:
@@ -232,6 +259,9 @@ def hashTxBody(txBody:dict) -> str:
 
 def randomNumber() -> int:
     """
-    Return a random integer that is below the max on-chain integer value.
+    The function, secrets.randbelow(n), returns a random int in the range [0, n).
+    The value of n will be the max integer value for on-chain data, 2^64 - 1.
+
+    @see: https://docs.python.org/3/library/secrets.html#secrets.randbelow
     """
     return randbelow(pow(2, 64) - 1)

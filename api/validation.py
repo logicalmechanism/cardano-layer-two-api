@@ -16,12 +16,23 @@ def didPkhSignTx(sig:str, key:str) -> str:
         key
     ]
     return subprocess.Popen(func, stdout=subprocess.PIPE).stdout.read().decode('utf-8')
-    
+
+def doOutputPkhsExist(outputs:dict) -> bool:
+    """
+    Check that all the outbound addresses actually exist.
+    """
+    for pkh in outputs:
+        try:
+            Account.objects.get(pkh=pkh)
+        except:
+            return False
+    return True
 
 def doesPkhOwnInputs(pkh:str, inputs:dict, amount: int) -> bool:
     """
     Check if the pkh provided in a transactions owns the inputs.
     """
+    # print(Account.objects.get(pkh=pkh))
     try:
         for entry in Entry.objects.filter(account=Account.objects.get(pkh=pkh)):
             if str(entry.utxo.txId) in inputs:
@@ -42,7 +53,10 @@ def isTxConserved(inputs:dict, outputs:dict, fee:int, contract:str) -> bool:
     outputTotal = {}
     # Sum inputs
     for txId in inputs:
-        utxo = UTxO.objects.get(txId=txId)
+        try:
+            utxo = UTxO.objects.get(txId=txId)
+        except:
+            continue
         if len(utxo.datum.all()) != 0:
             if contract == "always_succeed":
                 return False
@@ -76,6 +90,7 @@ def isTxConserved(inputs:dict, outputs:dict, fee:int, contract:str) -> bool:
                 inputTotal[pid][tkn] -= outputTotal[pid][tkn]
             except KeyError:
                 return False
+    
     for pid in feeTotal:
         for tkn in feeTotal[pid]:
             try:

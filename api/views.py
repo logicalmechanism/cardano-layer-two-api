@@ -1,5 +1,3 @@
-from multiprocessing.sharedctypes import Value
-from weakref import KeyedRef
 from api.models import Entry, Account, UTxO, Task
 from api.validation import didPkhSignTx, isTxConserved, doesPkhOwnInputs
 from api.helper import hashTxBody, deleteUtxosWrapper, newUtxosWrapper, sendTxWrapper, validateTxWrapper, merkleTree, randomNumber
@@ -41,6 +39,8 @@ class TaskViewSet(viewsets.ModelViewSet):
 
         Payload Format: CBOR
 
+        {number, cbor} -> {'number':0, 'cbor':CBOR([txBody, [txSign], contract])}
+
         [txBody, [txSign], contract] -> [
             {inputs:{}, outputs:{}, fee:0}, 
             [
@@ -66,9 +66,16 @@ class TaskViewSet(viewsets.ModelViewSet):
         # check payload
         try:
             num = int(data['number'])
-            if num < 0:
-                bad['data'] = "Missing Data"
-                return Response(bad)
+            # the number must be the last one 
+            try:
+                lastNumber = Task.objects.all().latest('id').number
+                if lastNumber + 1 != num:
+                    bad['data'] = "Missing Data"
+                    return Response(bad)
+            except:
+                if num != 0:
+                    bad['data'] = "Missing Data"
+                    return Response(bad)
             
             cbor = data['cbor']
             if type(cbor) != str:
@@ -110,13 +117,32 @@ class TaskViewSet(viewsets.ModelViewSet):
             if validateTxWrapper(cbor_data) is False:
                 bad['data'] = 'Fail'
                 return Response(bad)
+            # the db update based off of the cbor here
+            inputs  = [utxo for utxo in cbor_data[0]['inputs']]
+            deleteData = {}
+            for signature in cbor_data[1]:
+                pkh = signature['pkh']
+                deleteData[pkh] = []
+                for entry in Entry.objects.filter(account=Account.objects.get(pkh=pkh)):
+                    txId = entry.utxo.txId
+                    if txId in inputs:
+                        deleteData[pkh].append(txId)
+
+            for p in deleteData:
+                deleteUtxosWrapper(p, deleteData[p])
+            thisTxId = hashTxBody(cbor_data[0])
+            counter = 0
+            for out in cbor_data[0]['outputs']:
+                newUtxosWrapper(out, {thisTxId+'#'+str(counter): cbor_data[0]['outputs'][out]})
+                counter += 1
+            # delete inputs and create outputs
         except KeyError:
             bad['data'] = "Missing Data"
             return Response(bad)
         
         # add data the task db
         Task.objects.create(number=num,cbor=cbor)
-        
+        # print(Task.objects.all().latest('id').number)
         good['data'] ='Success'
         return Response(good)
     
@@ -207,18 +233,22 @@ class EntryViewSet(viewsets.ModelViewSet):
             bad['data'] = 'Wrong Data Type'
             return Response(bad)
         
+        # check if both keys are there
         try:
-            pkh = str(data['pkh'])
+            pkh = str(data['pkh']) # force string
             utxos = data['utxos']
         except KeyError:
             bad['data'] = 'Missing Fields'
             return Response(bad)
         
+        if type(utxos) != dict:
+            bad['data'] = 'Wrong Data Type'
+            return Response(bad)
+
         # must have utxos
         if len(utxos) == 0:
             bad['data'] = 'Missing Fields'
             return Response(bad)
-        
         # validate the incoming utxo
         if newUtxosWrapper(pkh, utxos) is True:
             good['data'] = 'Success'
@@ -294,18 +324,18 @@ class EntryViewSet(viewsets.ModelViewSet):
             return Response(bad)
         
         # must have an account to get utxos
+        # for a in Account.objects.all():
+        #     print(a.pkh)
         try:
             acct = Account.objects.get(pkh=pkh)
         except:
             return Response(noAccount)
-        
         # loop the entries for the account and return a value of all the data
         utxos = {}
         for entry in Entry.objects.filter(account=acct):
             # loop all tokens in value
             value = entry.utxo.value
             for val in value.all():
-                
                 tkn = val.token
                 amt = val.amount
                 # dict of txid to value
@@ -363,10 +393,13 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         Payload Format: CBOR
 
-        {inputs, outputs, fee} -> {inputs:[], outputs:{}, fee:0}
+        {inputs, outputs, fee} -> {inputs:{}, outputs:{}, fee:0}
 
-        inputs  -> ['tx_hash#1', 'tx_hash#2']
-        outputs -> {'pkh':{'pid1':{'tkn1':amt1}, 'pid2':{'tkn2':amt2}}}
+        inputs  -> {'tx_hash#1':redeemer1, 'tx_hash#2':{}}
+        outputs -> {
+            'pkh1':{'pid1':{'tkn1':amt1}, 'pid2':{'tkn2':amt2}, data:{}},
+            'pkh2':{'pid2':{'tkn2':amt2}, data:datum2}
+        }
         """
         # check for missing data
         try:
@@ -395,7 +428,7 @@ class EntryViewSet(viewsets.ModelViewSet):
             return Response(bad)
         
         # check sub field types
-        if type(data['inputs']) != list:
+        if type(data['inputs']) != dict:
             bad['data'] = 'Wrong Data Type'
             return Response(bad)
         if type(data['outputs']) != dict:
@@ -418,9 +451,8 @@ class EntryViewSet(viewsets.ModelViewSet):
 
         @see: api.tests.randN
         """
-        value = randomNumber()
         # attach payload and return
-        good['data'] = value
+        good['data'] = randomNumber()
         return Response(good)
 
     # validates a transaction
@@ -441,9 +473,9 @@ class EntryViewSet(viewsets.ModelViewSet):
             'smart_contract'
             ]
 
-        inputs  -> {'tx_hash#1':{}, 'tx_hash#2':{}}
+        inputs  -> {'tx_hash#1':redeemer1, 'tx_hash#2':redeemer2}
         outputs -> {
-            'pkh1':{'pid1':{'tkn1':amt1}, 'pid2':{'tkn2':amt2}, 'data':{}},
+            'pkh1':{'pid1':{'tkn1':amt1}, 'pid2':{'tkn2':amt2}, 'data':datum1},
             'pkh2':{'pid1':{'tkn1':amt1}, 'data':{}}
             }
         

@@ -18,12 +18,13 @@ npm install
 Migrate the db. May need to do a force migrate with sync db.
 ```
 python manage.py makemigrations
-python manage.py migrate
+python manage.py migrate --run-syncdb
 ```
 
 Create a api token from a user, typically a superuser.
 ```
-python manage.py drf_create_token <username>
+python manage.py createsuperuser
+python manage.py drf_create_token <superusername>
 ```
 
 Run api server

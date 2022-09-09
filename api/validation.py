@@ -32,6 +32,7 @@ def doesPkhOwnInputs(pkh:str, inputs:dict, amount: int) -> bool:
     """
     Check if the pkh provided in a transactions owns the inputs.
     """
+    # print(Account.objects.get(pkh=pkh))
     try:
         for entry in Entry.objects.filter(account=Account.objects.get(pkh=pkh)):
             if str(entry.utxo.txId) in inputs:
@@ -89,6 +90,7 @@ def isTxConserved(inputs:dict, outputs:dict, fee:int, contract:str) -> bool:
                 inputTotal[pid][tkn] -= outputTotal[pid][tkn]
             except KeyError:
                 return False
+    
     for pid in feeTotal:
         for tkn in feeTotal[pid]:
             try:

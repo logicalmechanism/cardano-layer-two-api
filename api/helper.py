@@ -101,7 +101,7 @@ def validateTxWrapper(data:list) -> bool:
             return False
     except KeyError:
         return False
-
+    
     # Check transaction
     if isTxConserved(inputs, outputs, fee, func_name) is False:
         return False
@@ -150,6 +150,8 @@ def validateTxWrapper(data:list) -> bool:
         outcome = outcome.replace('\n', '')
         if outcome != pkh:
             return False
+        
+
 
     # Missing Signers
     if totalInputs != 0:
@@ -210,12 +212,11 @@ def newUtxosWrapper(pkh:str, utxos:dict) -> bool:
                 # positive non zero integers only
                 if amt < 1:
                     return False
-                
                 t = Token(pid=pid, name=tkn)
                 t.save()
                 v = Value(token=t , amount=amt)
                 v.save()
-                u = UTxO.objects.create(txId=hashTxBody(utxo)+'#'+str(counter))
+                u = UTxO.objects.create(txId=utxo)
                 u.value.set([v])
                 
                 # attach datum if any

@@ -39,6 +39,8 @@ class TaskViewSet(viewsets.ModelViewSet):
 
         Payload Format: CBOR
 
+        {number, cbor} -> {'number':0, 'cbor':CBOR([txBody, [txSign], contract])}
+
         [txBody, [txSign], contract] -> [
             {inputs:{}, outputs:{}, fee:0}, 
             [
@@ -115,7 +117,6 @@ class TaskViewSet(viewsets.ModelViewSet):
             if validateTxWrapper(cbor_data) is False:
                 bad['data'] = 'Fail'
                 return Response(bad)
-            
             # the db update based off of the cbor here
             inputs  = [utxo for utxo in cbor_data[0]['inputs']]
             deleteData = {}
@@ -129,7 +130,6 @@ class TaskViewSet(viewsets.ModelViewSet):
 
             for p in deleteData:
                 deleteUtxosWrapper(p, deleteData[p])
-
             thisTxId = hashTxBody(cbor_data[0])
             counter = 0
             for out in cbor_data[0]['outputs']:
@@ -249,7 +249,6 @@ class EntryViewSet(viewsets.ModelViewSet):
         if len(utxos) == 0:
             bad['data'] = 'Missing Fields'
             return Response(bad)
-        
         # validate the incoming utxo
         if newUtxosWrapper(pkh, utxos) is True:
             good['data'] = 'Success'

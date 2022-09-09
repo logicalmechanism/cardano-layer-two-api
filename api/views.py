@@ -64,9 +64,16 @@ class TaskViewSet(viewsets.ModelViewSet):
         # check payload
         try:
             num = int(data['number'])
-            if num < 0:
-                bad['data'] = "Missing Data"
-                return Response(bad)
+            # the number must be the last one 
+            try:
+                lastNumber = Task.objects.all().latest('id').number
+                if lastNumber + 1 != num:
+                    bad['data'] = "Missing Data"
+                    return Response(bad)
+            except:
+                if num != 0:
+                    bad['data'] = "Missing Data"
+                    return Response(bad)
             
             cbor = data['cbor']
             if type(cbor) != str:
@@ -135,7 +142,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         
         # add data the task db
         Task.objects.create(number=num,cbor=cbor)
-        
+        # print(Task.objects.all().latest('id').number)
         good['data'] ='Success'
         return Response(good)
     

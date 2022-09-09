@@ -28,6 +28,6 @@ class Entry(models.Model):
     utxo    = models.ForeignKey(UTxO, on_delete=models.CASCADE)
 
 class Task(models.Model):
-    number  = models.IntegerField()
+    number  = models.IntegerField(unique=True)
     cbor    = models.TextField()
 

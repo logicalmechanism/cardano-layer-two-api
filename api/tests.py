@@ -61,6 +61,24 @@ class TaskApiTest(TestCase):
         self.assertEqual(view.status_code, 200)
         self.assertEqual(view.data['status'], 200)
         self.assertEqual(view.data['data'], 'Success')
+    
+    def test_new_task_good_data_bad_number(self):
+        test_data = dumps({
+            "pkh":self.test_pkh1,
+            "utxos":{"utxo1":{"":{"":10}}}
+        }).hex()
+        request = RequestFactory().post('/entries/newUTxO/', {'payload': test_data})
+        view = EntryViewSet.newUTxO(self, request)
+
+        test_data = dumps({
+            "number": 1,
+            "cbor": self.goodCbor
+        }).hex()
+        request = RequestFactory().post('/tasks/newTask/', {'payload': test_data})
+        view = TaskViewSet.newTask(self, request)
+        self.assertEqual(view.status_code, 200)
+        self.assertEqual(view.data['status'], 400)
+        self.assertEqual(view.data['data'], 'Missing Data')
 
     def test_new_task_bad_data(self):
         test_data = dumps({

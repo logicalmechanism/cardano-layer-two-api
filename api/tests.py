@@ -61,9 +61,6 @@ class TaskApiTest(TestCase):
         self.assertEqual(view.status_code, 200)
         self.assertEqual(view.data['status'], 200)
         self.assertEqual(view.data['data'], 'Success')
-
-        # for e in Entry.objects.all():
-        #     print(e.utxo.txId)
     
     def test_new_task_good_data_bad_number(self):
         test_data = dumps({

@@ -8,9 +8,16 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from cbor2 import dumps, loads
 ###############################################################################
-#
+# Good / Bad Msg
 ###############################################################################
-
+SUCCESS        = "Success"
+FAIL           = "Fail"
+WRONG_DATA     = "Wrong Data Type"
+MISSING_DATA   = "Missing Data"
+MISSING_FIELDS = "Missing Fields"
+###############################################################################
+# status data strucutures
+###############################################################################
 good         = { 'status': 200, 'data': '' }
 bad          = { 'status': 400, 'data': 'Bad Data' }
 failed       = { 'status': 400, 'data': 'Tx Failed' }
@@ -19,7 +26,7 @@ utxoExist    = { 'status': 409, 'data': 'UTxO Already Exists' }
 noAccount    = { 'status': 401, 'data': 'No Account Exists' }
 
 ###############################################################################
-#
+# The task api endpoint
 ###############################################################################
 class TaskViewSet(viewsets.ModelViewSet):
     """
@@ -27,7 +34,6 @@ class TaskViewSet(viewsets.ModelViewSet):
     """
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
-    # permission_classes = [permissions.IsAuthenticated]
     
     # create a new task
     @action(methods=['post'], detail=False, permission_classes=[permissions.IsAdminUser])
@@ -58,7 +64,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         try:
             data = str(request.POST['payload'])
         except KeyError:
-            bad['data'] = "Missing Data"
+            bad['data'] = MISSING_DATA
             return Response(bad)
 
         data = loads(bytes.fromhex(data)) # uncbor the data
@@ -70,52 +76,52 @@ class TaskViewSet(viewsets.ModelViewSet):
             try:
                 lastNumber = Task.objects.all().latest('id').number
                 if lastNumber + 1 != num:
-                    bad['data'] = "Missing Data"
+                    bad['data'] = MISSING_DATA
                     return Response(bad)
             except:
                 if num != 0:
-                    bad['data'] = "Missing Data"
+                    bad['data'] = MISSING_DATA
                     return Response(bad)
             
             cbor = data['cbor']
             if type(cbor) != str:
-                bad['data'] = 'Wrong Data Type'
+                bad['data'] = WRONG_DATA
                 return Response(bad)
             
             if cbor == '':
-                bad['data'] = "Missing Data"
+                bad['data'] = MISSING_DATA
                 return Response(bad)
             
             try:
                 cbor_data = loads(bytes.fromhex(cbor)) # uncbor the data
             except ValueError:
-                bad["data"] = "Wrong Data Type"
+                bad["data"] = WRONG_DATA
                 return Response(bad)
                 
             # data structure check
             if type(cbor_data) != list:
-                bad["data"] = "Wrong Data Type"
+                bad["data"] = WRONG_DATA
                 return Response(bad)
             
             # must contain the body and sig
             if len(cbor_data) != 3:
-                bad['data'] = 'Missing Fields'
+                bad['data'] = MISSING_FIELDS
                 return Response(bad)
             
             # check sub field types
             if type(cbor_data[0]) != dict:
-                bad['data'] = 'Wrong Data Type'
+                bad['data'] = WRONG_DATA
                 return Response(bad)
             if type(cbor_data[1]) != list:
-                bad['data'] = 'Wrong Data Type'
+                bad['data'] = WRONG_DATA
                 return Response(bad)
             if type(cbor_data[2]) != str:
-                bad['data'] = 'Wrong Data Type'
+                bad['data'] = WRONG_DATA
                 return Response(bad)
             
             # validate the data
             if validateTxWrapper(cbor_data) is False:
-                bad['data'] = 'Fail'
+                bad['data'] = FAIL
                 return Response(bad)
             # the db update based off of the cbor here
             inputs  = [utxo for utxo in cbor_data[0]['inputs']]
@@ -137,13 +143,12 @@ class TaskViewSet(viewsets.ModelViewSet):
                 counter += 1
             # delete inputs and create outputs
         except KeyError:
-            bad['data'] = "Missing Data"
+            bad['data'] = MISSING_DATA
             return Response(bad)
         
         # add data the task db
         Task.objects.create(number=num,cbor=cbor)
-        # print(Task.objects.all().latest('id').number)
-        good['data'] ='Success'
+        good['data'] = SUCCESS
         return Response(good)
     
     # get all the tasks
@@ -163,6 +168,9 @@ class TaskViewSet(viewsets.ModelViewSet):
         good['data'] = payload
         return Response(good)
 
+###############################################################################
+# The entry api endpoint
+###############################################################################
 class EntryViewSet(viewsets.ModelViewSet):
     """
     API endpoints for the state db of entries.
@@ -186,7 +194,7 @@ class EntryViewSet(viewsets.ModelViewSet):
         try:
             pkh = str(request.POST['payload'])
         except KeyError:
-            bad['data'] = "Missing Data"
+            bad['data'] = MISSING_DATA
             return Response(bad)
 
         # payment public key hash only, length 56
@@ -201,7 +209,7 @@ class EntryViewSet(viewsets.ModelViewSet):
             return Response(accountExist)
         
         # good to go
-        good['data'] ='Success'
+        good['data'] =SUCCESS
         return Response(good)
 
     # create a new entry
@@ -221,7 +229,7 @@ class EntryViewSet(viewsets.ModelViewSet):
         try:
             data = str(request.POST['payload'])
         except KeyError:
-            bad['data'] = "Missing Data"
+            bad['data'] = MISSING_DATA
             return Response(bad)
         
         # Dict of utxos and amounts
@@ -229,7 +237,7 @@ class EntryViewSet(viewsets.ModelViewSet):
         
         # check data type
         if type(data) != dict:
-            bad['data'] = 'Wrong Data Type'
+            bad['data'] = WRONG_DATA
             return Response(bad)
         
         # check if both keys are there
@@ -237,24 +245,24 @@ class EntryViewSet(viewsets.ModelViewSet):
             pkh = str(data['pkh']) # force string
             utxos = data['utxos']
         except KeyError:
-            bad['data'] = 'Missing Fields'
+            bad['data'] = MISSING_FIELDS
             return Response(bad)
         
         if type(utxos) != dict:
-            bad['data'] = 'Wrong Data Type'
+            bad['data'] = WRONG_DATA
             return Response(bad)
 
         # must have utxos
         if len(utxos) == 0:
-            bad['data'] = 'Missing Fields'
+            bad['data'] = MISSING_FIELDS
             return Response(bad)
         # validate the incoming utxo
         if newUtxosWrapper(pkh, utxos) is True:
-            good['data'] = 'Success'
+            good['data'] = SUCCESS
             return Response(good)
         else:
             # this fail is like 3+ different possible failures.
-            bad['data'] = 'Fail'
+            bad['data'] = FAIL
             return Response(bad)
     
     # deletes a list utxos
@@ -275,7 +283,7 @@ class EntryViewSet(viewsets.ModelViewSet):
         try:
             data = str(request.POST['payload'])
         except KeyError:
-            bad['data'] = "Missing Data"
+            bad['data'] = MISSING_DATA
             return Response(bad)
         
         # List of UTxOs to Delete from an Account
@@ -283,7 +291,7 @@ class EntryViewSet(viewsets.ModelViewSet):
         
         # check for correct data structure
         if type(data) != dict:
-            bad['data'] = 'Wrong Data Type'
+            bad['data'] = WRONG_DATA
             return Response(bad)
         
         # check if object has correct data
@@ -291,11 +299,11 @@ class EntryViewSet(viewsets.ModelViewSet):
             pkh = str(data['pkh'])
             utxos = data['utxos']
         except KeyError:
-            bad['data'] = 'Missing Fields'
+            bad['data'] = MISSING_FIELDS
             return Response(bad)
 
         if deleteUtxosWrapper(pkh, utxos) is True:
-            good['data'] = 'Success'
+            good['data'] = SUCCESS
             return Response(good)
         else:
             # this can only fail wit a no account
@@ -319,12 +327,10 @@ class EntryViewSet(viewsets.ModelViewSet):
         try:
             pkh = str(request.POST['payload'])
         except KeyError:
-            bad['data'] = "Missing Data"
+            bad['data'] = MISSING_DATA
             return Response(bad)
         
         # must have an account to get utxos
-        # for a in Account.objects.all():
-        #     print(a.pkh)
         try:
             acct = Account.objects.get(pkh=pkh)
         except:
@@ -361,7 +367,7 @@ class EntryViewSet(viewsets.ModelViewSet):
         try:
             pkh = str(request.POST['payload'])
         except KeyError:
-            bad['data'] = "Missing Data"
+            bad['data'] = MISSING_DATA
             return Response(bad)
         
         # must have an account to get utxos
@@ -404,17 +410,17 @@ class EntryViewSet(viewsets.ModelViewSet):
         try:
             data = str(request.POST['payload'])
         except KeyError:
-            bad['data'] = "Missing Data"
+            bad['data'] = MISSING_DATA
             return Response(bad)
 
         data = loads(bytes.fromhex(data))
 
         # data structure check
         if type(data) != dict:
-            bad['data'] = 'Wrong Data Type'
+            bad['data'] = WRONG_DATA
             return Response(bad)
         if len(data) != 3:
-            bad['data'] = 'Missing Fields'
+            bad['data'] = MISSING_FIELDS
             return Response(bad)
         
         # make sure fields exist
@@ -423,18 +429,18 @@ class EntryViewSet(viewsets.ModelViewSet):
             data['outputs']
             data['fee']
         except KeyError:
-            bad['data'] = 'Missing Fields'
+            bad['data'] = MISSING_FIELDS
             return Response(bad)
         
         # check sub field types
         if type(data['inputs']) != dict:
-            bad['data'] = 'Wrong Data Type'
+            bad['data'] = WRONG_DATA
             return Response(bad)
         if type(data['outputs']) != dict:
-            bad['data'] = 'Wrong Data Type'
+            bad['data'] = WRONG_DATA
             return Response(bad)
         if type(data['fee']) != int:
-            bad['data'] = 'Wrong Data Type'
+            bad['data'] = WRONG_DATA
             return Response(bad)
 
         hashedData = hashTxBody(data)
@@ -487,37 +493,37 @@ class EntryViewSet(viewsets.ModelViewSet):
         try:
             data = str(request.POST['payload'])
         except KeyError:
-            bad['data'] = "Missing Data"
+            bad['data'] = MISSING_DATA
             return Response(bad)
         
         data = loads(bytes.fromhex(data))
         # data structure check
         if type(data) != list:
-            bad["data"] = "Wrong Data Type"
+            bad["data"] = WRONG_DATA
             return Response(bad)
         
         # must contain the body and sig
         if len(data) != 3:
-            bad['data'] = 'Missing Fields'
+            bad['data'] = MISSING_FIELDS
             return Response(bad)
         
         # check sub field types
         if type(data[0]) != dict:
-            bad['data'] = 'Wrong Data Type'
+            bad['data'] = WRONG_DATA
             return Response(bad)
         if type(data[1]) != list:
-            bad['data'] = 'Wrong Data Type'
+            bad['data'] = WRONG_DATA
             return Response(bad)
         if type(data[2]) != str:
-            bad['data'] = 'Wrong Data Type'
+            bad['data'] = WRONG_DATA
             return Response(bad)
 
         # validate the data
         if validateTxWrapper(data) is True:
-            good['data'] = 'Success'
+            good['data'] = SUCCESS
             return Response(good)
         else:
-            bad['data'] = 'Fail'
+            bad['data'] = FAIL
             return Response(bad)
 
     # merkle tree of a single users transactions
@@ -536,11 +542,11 @@ class EntryViewSet(viewsets.ModelViewSet):
         try:
             data = str(request.POST['payload'])
         except KeyError:
-            bad['data'] = "Missing Data"
+            bad['data'] = MISSING_DATA
             return Response(bad)
         
         if data == '':
-            bad['data'] = "Missing Data"
+            bad['data'] = MISSING_DATA
             return Response(bad)
 
         payload = []
